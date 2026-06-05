@@ -140,6 +140,62 @@ def _t(s):
     return "".join(out)
 
 
+def _email_ticket(cfg, to_email, pdf_bytes, png_bytes, human_code, name, package_label):
+    """E-mail the branded PDF ticket (QR embedded) to the buyer. Returns bool.
+    SMTP via env: SMTP_HOST, SMTP_PORT (587 STARTTLS / 465 SSL), SMTP_USER,
+    SMTP_PASS, SMTP_FROM. No-op (False) until SMTP_HOST is set."""
+    host = (cfg.get("SMTP_HOST") or "").strip()
+    if not host or not to_email:
+        return False
+    import smtplib
+    import ssl
+    from email.message import EmailMessage
+    try:
+        port = int(cfg.get("SMTP_PORT") or 587)
+    except Exception:
+        port = 587
+    user = cfg.get("SMTP_USER") or ""
+    pw = cfg.get("SMTP_PASS") or ""
+    sender = cfg.get("SMTP_FROM") or user or "no-reply@sadaosato.pro"
+    pl = _PKG_LABEL.get(str(package_label), package_label or "Участие")
+    msg = EmailMessage()
+    msg["Subject"] = "Ваш билет — саммит «Казань — Токио 2026»"
+    msg["From"] = sender
+    msg["To"] = to_email
+    msg.set_content(
+        "Здравствуйте, %s!\n\nВаша оплата подтверждена. Билет на международный стоматологический "
+        "саммит «Казань — Токио 2026» — во вложении (PDF с QR-кодом).\n\nТариф: %s\nКод билета: %s\n\n"
+        "Предъявите QR на входе (вход однократный).\nПоддержка: %s\n\nsadaosato.pro"
+        % (name or "участник", pl, human_code, cfg.get("SUPPORT_PHONE") or "")
+    )
+    msg.add_attachment(pdf_bytes, maintype="application", subtype="pdf", filename="ticket-kazan-tokyo.pdf")
+    if png_bytes:
+        msg.add_attachment(png_bytes, maintype="image", subtype="png", filename="ticket-qr.png")
+    try:
+        ctx = ssl.create_default_context()
+        if port == 465:
+            with smtplib.SMTP_SSL(host, port, timeout=20, context=ctx) as s:
+                if user:
+                    s.login(user, pw)
+                s.send_message(msg)
+        else:
+            with smtplib.SMTP(host, port, timeout=20) as s:
+                s.ehlo()
+                try:
+                    s.starttls(context=ctx)
+                    s.ehlo()
+                except Exception:
+                    pass
+                if user:
+                    s.login(user, pw)
+                s.send_message(msg)
+        log.info("ticket emailed to %s (code %s)", to_email, human_code)
+        return True
+    except Exception as exc:
+        log.error("ticket email to %s failed: %s", to_email, exc)
+        return False
+
+
 def issue_ticket(reg_id):
     """Mint + persist a ticket for a registration. Sets status ticket_issued.
 
@@ -211,13 +267,29 @@ def issue_ticket(reg_id):
     png = _render_qr_png(qr_payload)
     pdf = _render_pdf(cfg, row.get("full_name"), row.get("package"), row.get("price_eur"), human_code, png)
 
+    # e-mail the PDF ticket (QR embedded) to the buyer if we have an address + SMTP
+    emailed = False
+    to_email = (row.get("email_lc") or "").strip()
+    if to_email and "@" in to_email:
+        emailed = _email_ticket(cfg, to_email, pdf, png, human_code, row.get("full_name"), row.get("package"))
+        if emailed:
+            try:
+                c = reg._conn()
+                c.execute("UPDATE registrations SET qr_delivered_channels="
+                          "COALESCE(NULLIF(qr_delivered_channels,''),'')||',email', updated_at=? WHERE id=?",
+                          (_now(), reg_id))
+                c.commit()
+                c.close()
+            except Exception:
+                pass
+
     # status -> ticket_issued (best effort; allow from paid)
     try:
         reg.set_status(reg_id, "ticket_issued", actor="manager", reason="ticket issued")
     except Exception:
         pass
     return {
-        "ticket_id": ticket_id, "human_code": human_code, "pretix_order": pretix_code,
+        "ticket_id": ticket_id, "human_code": human_code, "pretix_order": pretix_code, "emailed": emailed,
         "png_b64": base64.b64encode(png).decode(),
         "pdf_b64": base64.b64encode(pdf).decode(),
     }

@@ -1049,16 +1049,24 @@ def amo_lead_webhook(path_key=None):
     acc = form.get("account[id]") or ""
     if acc and str(acc) != str(amo_sync.ACCOUNT_ID):
         return jsonify({"ok": False, "error": "account_mismatch"}), 403
-    lead_id = form.get("leads[status][0][id]")
-    try:
-        new_status = int(form.get("leads[status][0][status_id]"))
-    except Exception:
-        return jsonify({"ok": True, "ignored": "no_status"})
-    if not lead_id:
-        return jsonify({"ok": True, "ignored": "no_lead"})
-    res = amo_sync.reverse_status_change(int(lead_id), new_status)
-    logger.info("amo reverse webhook lead=%s status=%s -> %s", lead_id, new_status, res)
-    return jsonify({"ok": True, **res})
+    # 1) stage change (manager dragged the card)
+    sid = form.get("leads[status][0][id]")
+    if sid:
+        try:
+            new_status = int(form.get("leads[status][0][status_id]"))
+        except Exception:
+            return jsonify({"ok": True, "ignored": "no_status"})
+        res = amo_sync.reverse_status_change(int(sid), new_status)
+        logger.info("amo reverse status lead=%s -> %s -> %s", sid, new_status, res)
+        return jsonify({"ok": True, **res})
+    # 2) field update (e.g. «Статус оплаты»=Оплачено) -> automation issues + moves card
+    uid = form.get("leads[update][0][id]")
+    if uid:
+        res = amo_sync.reverse_field_paid(int(uid))
+        if res.get("action") not in ("pay_field_not_set", "already_done"):
+            logger.info("amo reverse update lead=%s -> %s", uid, res)
+        return jsonify({"ok": True, **res})
+    return jsonify({"ok": True, "ignored": "no_event"})
 
 
 try:
