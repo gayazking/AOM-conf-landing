@@ -38,6 +38,7 @@ except Exception:
     pass
 
 import reg
+import pretix_link
 
 log = logging.getLogger("sato")
 bp = Blueprint("tickets", __name__)
@@ -106,7 +107,11 @@ def _render_pdf(cfg, full_name, package_label, price_eur, human_code, qr_png):
     if cfg.get("EVENT_DATES"): lines.append("Даты: " + cfg.get("EVENT_DATES"))
     if cfg.get("VENUE"): lines.append("Место: " + cfg.get("VENUE"))
     lines.append("Код билета: " + human_code)
-    lines.append("Вход однократный. Предъявите QR на входе.")
+    if str(package_label) == "500":
+        lines.append("Онлайн-доступ. QR открывает трансляцию.")
+    else:
+        lines.append("Вход однократный. Предъявите QR на входе.")
+    if cfg.get("SUPPORT_PHONE"): lines.append("Поддержка: " + cfg.get("SUPPORT_PHONE"))
     for ln in lines:
         c.drawCentredString(W/2, y, ln); y -= 7*mm
     c.setFillColorRGB(0.5, 0.53, 0.6); c.setFont(_FONT, 9)
@@ -137,7 +142,12 @@ def _t(s):
 
 def issue_ticket(reg_id):
     """Mint + persist a ticket for a registration. Sets status ticket_issued.
-    Returns dict(ticket_id, human_code, png_b64, pdf_b64) or None."""
+
+    Primary path: create (or reuse) a PAID order in pretix; the QR payload is
+    the pretix position secret, so registrars validate it with pretixSCAN. If
+    pretix is unreachable, fall back to the legacy HMAC token + local single-use.
+    Returns dict(ticket_id, human_code, pretix_order, png_b64, pdf_b64) or None.
+    """
     cfg = _cfg()
     c = reg._conn()
     try:
@@ -145,33 +155,69 @@ def issue_ticket(reg_id):
         if not row:
             return None
         row = dict(row)
-        ticket_id = row.get("ticket_id")
-        human_code = None
+    finally:
+        c.close()
+
+    qr_payload = None
+    human_code = None
+    ticket_id = row.get("ticket_id")
+    pretix_code = None
+
+    # --- primary: pretix paid order, QR = position secret ---
+    try:
+        porder = pretix_link.create_paid_order(row)
+    except Exception as exc:
+        log.error("pretix create_paid_order error: %s", exc)
+        porder = None
+    if porder and porder.get("secret"):
+        qr_payload = porder["secret"]
+        pretix_code = porder.get("code")
+        human_code = pretix_code
+        ticket_id = ticket_id or pretix_code
+        row["pretix_order_code"] = pretix_code
+        row["pretix_secret"] = qr_payload
+        c = reg._conn()
+        try:
+            c.execute("UPDATE registrations SET ticket_id=COALESCE(ticket_id,?), ticket_issued_at=COALESCE(ticket_issued_at,?), updated_at=? WHERE id=?",
+                      (ticket_id, _now(), _now(), reg_id))
+            c.commit()
+        finally:
+            c.close()
+
+    # --- fallback: legacy HMAC token + local DB single-use ---
+    if qr_payload is None:
         if not ticket_id:
             ticket_id = secrets.token_urlsafe(12)
             human_code = _human_code()
-            c.execute(
-                "UPDATE registrations SET ticket_id=?, ticket_issued_at=?, qr_delivered_channels=COALESCE(qr_delivered_channels,''), updated_at=? WHERE id=?",
-                (ticket_id, _now(), _now(), reg_id),
-            )
-            # store human code in message-ish? keep in a column-free way: reuse badge_name? No.
-            c.execute("UPDATE registrations SET check_in_gate=COALESCE(check_in_gate,?) WHERE id=?", (None, reg_id))
-            c.commit()
-        token = _ser(cfg).dumps({"tid": ticket_id})
-        png = _render_qr_png(token)
-        # human_code stable: derive from ticket_id if not freshly minted
+            c = reg._conn()
+            try:
+                c.execute(
+                    "UPDATE registrations SET ticket_id=?, ticket_issued_at=?, qr_delivered_channels=COALESCE(qr_delivered_channels,''), updated_at=? WHERE id=?",
+                    (ticket_id, _now(), _now(), reg_id),
+                )
+                c.commit()
+            finally:
+                c.close()
+        qr_payload = _ser(cfg).dumps({"tid": ticket_id})
         if human_code is None:
             human_code = ticket_id[:6].upper()
-        pdf = _render_pdf(cfg, row.get("full_name"), row.get("package"), row.get("price_eur"), human_code, png)
-    finally:
-        c.close()
+
+    # online tariff (500): QR opens the broadcast stream instead of a door secret
+    # (pretix order/secret stay persisted for records); falls back to the secret
+    # until BROADCAST_URL is configured.
+    if str(row.get("package") or "") == "500" and cfg.get("BROADCAST_URL"):
+        qr_payload = cfg.get("BROADCAST_URL")
+
+    png = _render_qr_png(qr_payload)
+    pdf = _render_pdf(cfg, row.get("full_name"), row.get("package"), row.get("price_eur"), human_code, png)
+
     # status -> ticket_issued (best effort; allow from paid)
     try:
         reg.set_status(reg_id, "ticket_issued", actor="manager", reason="ticket issued")
     except Exception:
         pass
     return {
-        "ticket_id": ticket_id, "human_code": human_code,
+        "ticket_id": ticket_id, "human_code": human_code, "pretix_order": pretix_code,
         "png_b64": base64.b64encode(png).decode(),
         "pdf_b64": base64.b64encode(pdf).decode(),
     }
@@ -221,6 +267,62 @@ def api_issue_ticket():
     return jsonify(ok=True, **t)
 
 
+@bp.route("/api/kassa/webhook", methods=["POST"])
+def api_kassa_webhook():
+    """DORMANT reverse webhook for a future online cash register (онлайн-касса).
+
+    Disabled until KASSA_WEBHOOK_SECRET is set in the env (returns 403). When the
+    касса is connected it POSTs a paid notification here; we mark the registration
+    paid and issue the ticket (which creates the PAID pretix order). Delivery to
+    the buyer's Telegram is best-effort via the bot internal URL.
+    """
+    cfg = _cfg()
+    secret = cfg.get("KASSA_WEBHOOK_SECRET") or ""
+    if not secret:
+        return jsonify(ok=False, error="disabled"), 403
+    d = request.get_json(force=True, silent=True) or {}
+    sig = request.headers.get("X-Kassa-Secret", "") or d.get("secret", "")
+    if sig != secret:
+        return jsonify(ok=False, error="forbidden"), 403
+    if str(d.get("status") or "paid").lower() not in ("paid", "succeeded", "success", "confirmed"):
+        return jsonify(ok=True, ignored=True)
+    ident = str(d.get("reg_id") or d.get("phone") or d.get("email") or d.get("order") or "").strip()
+    if not ident:
+        return jsonify(ok=False, error="no_identifier"), 400
+    c = reg._conn()
+    try:
+        row = c.execute(
+            "SELECT id FROM registrations WHERE id=? OR phone_e164=? OR email_lc=? OR pretix_order_code=?",
+            (ident, reg.normalize_phone(ident), ident.lower(), ident)).fetchone()
+    finally:
+        c.close()
+    if not row:
+        return jsonify(ok=False, error="reg_not_found"), 404
+    reg_id = row["id"]
+    try:
+        reg.set_status(reg_id, "paid", actor="kassa", reason="online kassa webhook", force=True)
+    except Exception:
+        pass
+    t = issue_ticket(reg_id)
+    if not t:
+        return jsonify(ok=False, error="issue_failed"), 500
+    delivered = False
+    bot_url = cfg.get("BOT_INTERNAL_URL") or ""
+    if bot_url:
+        try:
+            import json as _json
+            import urllib.request
+            req = urllib.request.Request(
+                bot_url.rstrip("/") + "/deliver_ticket",
+                data=_json.dumps({"reg_id": reg_id, "token": cfg.get("INTERNAL_TOKEN", "")}).encode(),
+                headers={"Content-Type": "application/json"})
+            urllib.request.urlopen(req, timeout=8)
+            delivered = True
+        except Exception as exc:
+            log.warning("kassa webhook bot deliver failed: %s", exc)
+    return jsonify(ok=True, pretix_order=t.get("pretix_order"), human_code=t.get("human_code"), delivered=delivered)
+
+
 @bp.route("/api/checkin", methods=["POST"])
 def api_checkin():
     cfg = _cfg()
@@ -231,6 +333,23 @@ def api_checkin():
     token = (d.get("token") or "").strip()
     gate = d.get("gate") or "main"
     staff_name = d.get("staff") or ""
+
+    # --- primary: pretix redeem (new QRs carry the pretix position secret) ---
+    try:
+        res, info = pretix_link.redeem(token)
+    except Exception as exc:
+        log.error("pretix redeem error: %s", exc)
+        res, info = "error", {}
+    if res in ("ok", "already", "unpaid"):
+        name = (info or {}).get("name")
+        _scan(token[:24], {"ok": "ok", "already": "duplicate", "unpaid": "unpaid"}[res], gate, staff_name)
+        if res == "ok":
+            return jsonify(result="ok", name=name)
+        if res == "already":
+            return jsonify(result="duplicate", name=name)
+        return jsonify(result="unpaid", name=name)
+
+    # --- fallback: legacy HMAC token + local DB single-use ---
     tid = verify_ticket(cfg, token)
     if not tid:
         _scan(None, "invalid", gate, staff_name)
@@ -359,5 +478,9 @@ def checkin_page():
 
 
 def register(flask_app):
+    try:
+        pretix_link.init()
+    except Exception as exc:
+        log.error("pretix_link.init failed: %s", exc)
     flask_app.register_blueprint(bp)
     log.info("tickets blueprint registered")

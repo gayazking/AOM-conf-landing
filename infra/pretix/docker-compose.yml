@@ -1,0 +1,24 @@
+services:
+  pretix-db:
+    image: postgres:15
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: pretix
+      POSTGRES_USER: pretix
+      POSTGRES_PASSWORD: "CHANGEME_DB_PASSWORD"   # see /opt/pretix/pretix.cfg on the server
+    volumes: [pgdata:/var/lib/postgresql/data]
+  pretix-redis:
+    image: redis:7
+    restart: unless-stopped
+  pretix:
+    image: pretix/standalone:stable
+    restart: unless-stopped
+    depends_on: [pretix-db, pretix-redis]
+    command: all
+    ports: ["127.0.0.1:8345:80"]          # loopback only; nginx terminates TLS at /pretix/
+    volumes:
+      - ./pretix.cfg:/etc/pretix/pretix.cfg:ro   # must be readable by uid 15371 (chown 15371:15371)
+      - pretixdata:/data
+volumes:
+  pgdata: {}
+  pretixdata: {}

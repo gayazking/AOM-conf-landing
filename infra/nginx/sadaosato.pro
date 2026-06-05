@@ -1,6 +1,7 @@
 server {
     server_name sadaosato.pro www.sadaosato.pro;
     root /var/www/sadaosato;
+    location = /reg { proxy_pass http://127.0.0.1:8081; proxy_set_header Host $host; proxy_set_header X-Forwarded-Proto $scheme; }
     location /r/ { proxy_pass http://127.0.0.1:8081; proxy_set_header Host $host; proxy_set_header X-Real-IP $remote_addr; proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for; proxy_set_header X-Forwarded-Proto $scheme; }
     location = /checkin { proxy_pass http://127.0.0.1:8081; proxy_set_header Host $host; proxy_set_header X-Forwarded-Proto $scheme; }
     location /admin/ {
@@ -13,6 +14,18 @@ server {
     location = /consent { try_files /consent.html =404; }
     location = /oferta { try_files /oferta.html =404; }
     location = /privacy { try_files /privacy.html =404; }
+    # --- pretix (self-hosted ticketing, subpath /pretix/) ---
+    location = /pretix { return 301 /pretix/; }
+    location ^~ /pretix/ {
+        proxy_pass http://127.0.0.1:8345/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_redirect off;
+        client_max_body_size 25M;
+    }
     include /opt/sato/nginx-api.snippet;
     index index.html;
 

@@ -22,3 +22,8 @@ _ct/
 *_codepull.tgz
 sato-bot-ai.py.deployed
 .DS_Store
+# pretix — real secrets / single-use device tokens (templates committed instead)
+infra/pretix/pretix.cfg
+admin_pw.txt
+registrars/qr/
+

@@ -1,0 +1,27 @@
+# Copy to /opt/pretix/pretix.cfg, fill secrets, then:
+#   chown 15371:15371 /opt/pretix/pretix.cfg && chmod 640 /opt/pretix/pretix.cfg
+# (uid 15371 = the pretixuser inside the container; otherwise it falls back to
+#  defaults -> amqp broker + empty ALLOWED_HOSTS -> HTTP 400 on every request.)
+[pretix]
+instance_name=Казань — Токио 2026
+url=https://sadaosato.pro/pretix
+currency=EUR
+datadir=/data
+trust_x_forwarded_for=on
+trust_x_forwarded_proto=on
+secret=CHANGEME_RANDOM_64_HEX
+
+[database]
+backend=postgresql
+name=pretix
+user=pretix
+password=CHANGEME_DB_PASSWORD
+host=pretix-db
+
+[redis]
+location=redis://pretix-redis/0
+sessions=true
+
+[celery]
+backend=redis://pretix-redis/1
+broker=redis://pretix-redis/2
