@@ -42,6 +42,7 @@ _FORMAT = {"500": "Онлайн", "800": "Оффлайн", "1000": "Оффлай
 _WB = {"500": "Без браслета (онлайн)", "800": "Зелёный (800)", "1000": "Синий (1000)", "1800": "Золотой (1800)"}
 _TARIFF_TAG = {"500": "Теория · онлайн — 500 €", "800": "Теория · оффлайн — 800 €",
                "1000": "Практика · оффлайн — 1000 €", "1800": "Полный пакет (4 дня) — 1800 €"}
+_TARIFF_REV = {v: k for k, v in _TARIFF.items()}  # «Теория онлайн — 500 €» -> "500"
 
 
 # --------------------------------------------------------------------------- #
@@ -194,6 +195,23 @@ def _get_lead(lead_id, withp="contacts"):
         return r.json() if r.status_code == 200 else None
     except Exception:
         return None
+
+
+def _tariff_from_lead(lead_id):
+    """Read the «Тариф» select field from an amoCRM lead -> package "500".."1800"."""
+    lead = _get_lead(lead_id)
+    if not lead:
+        return None
+    fmap = _fields()
+    tid = (fmap.get("Тариф") or {}).get("id")
+    e2v = {eid: v for n, f in fmap.items() for v, eid in f["enums"].items()}
+    for cf in (lead.get("custom_fields_values") or []):
+        if cf.get("field_id") == tid:
+            for val in (cf.get("values") or []):
+                v = e2v.get(val.get("enum_id"))
+                if v in _TARIFF_REV:
+                    return _TARIFF_REV[v]
+    return None
 
 
 def safe_set_stage(lead_id, target):
@@ -416,8 +434,22 @@ def reverse_status_change(lead_id, new_status, phone=None):
 
     if new_status == ST_WIN:
         # manager confirmed payment by dragging to WIN -> issue ticket immediately
-        if not row.get("package"):
-            create_task(lead_id, "Дозаполните тариф — авто-билет не выпущен (нет пакета)", 1, 1800)
+        pkg = str(row.get("package") or "")
+        if pkg not in _TARIFF:
+            # site lead may have no tariff in our DB; read the amoCRM «Тариф» field
+            pkg = _tariff_from_lead(lead_id)
+            if pkg:
+                try:
+                    c = reg._conn()
+                    c.execute("UPDATE registrations SET package=?, price_eur=COALESCE(price_eur,?), updated_at=? WHERE id=?",
+                              (pkg, int(pkg), _now_iso(), reg_id))
+                    c.commit()
+                    c.close()
+                except Exception:
+                    pass
+                row["package"] = pkg
+        if pkg not in _TARIFF:
+            create_task(lead_id, "Выберите «Тариф» в карточке — авто-билет не выпущен (тариф не указан)", 1, 1800)
             return {"action": "win_no_package", "reg_id": reg_id}
         try:
             reg.set_status(reg_id, "paid", actor="amo:manager", reason="manual WIN in amoCRM", force=True)
@@ -428,11 +460,14 @@ def reverse_status_change(lead_id, new_status, phone=None):
         if not t:
             create_task(lead_id, "pretix недоступен — билет в очереди, выпустить вручную", 1, 3600)
             return {"action": "win_issue_failed", "reg_id": reg_id}
-        _deliver_via_bot(reg_id)
+        delivered = _deliver_via_bot(reg_id)
+        if not row.get("telegram_user_id") and not delivered:
+            create_task(lead_id, "Билет выпущен (код %s) — отправьте участнику вручную / на email (нет Telegram)"
+                        % t.get("human_code"), 1, 3600)
         forward(reg_id, "paid")          # Статус оплаты=Оплачено + Дата оплаты (stage already WIN by manager)
         forward(reg_id, "ticket_issued")  # Статус билета=Выпущен + № заказа pretix
         return {"action": "win_issued", "reg_id": reg_id, "pretix_order": t.get("pretix_order"),
-                "human_code": t.get("human_code")}
+                "human_code": t.get("human_code"), "delivered": delivered}
 
     if new_status == ST_LOST:
         try:

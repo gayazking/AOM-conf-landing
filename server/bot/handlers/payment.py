@@ -4,12 +4,13 @@ No card data is ever collected or stored — only external payment links.
 """
 from __future__ import annotations
 
+import base64
 import logging
 
 import aiohttp
 from aiogram import Bot, F, Router
 from aiogram.filters import Command
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import BufferedInputFile, CallbackQuery, Message
 
 import config
 import content
@@ -148,21 +149,9 @@ async def admin_confirm_payment(cb: CallbackQuery, bot: Bot) -> None:
         pass
 
 
-@router.message(Command("paid"))
-async def cmd_paid(message: Message, bot: Bot) -> None:
-    """Admin command: /paid <tg_id> — manually confirm a payment."""
-    if not common.is_admin(message.from_user.id):
-        await message.answer(content.ADMIN_NOT_ALLOWED)
-        return
-    parts = (message.text or "").split()
-    if len(parts) < 2 or not parts[1].lstrip("-").isdigit():
-        await message.answer("Использование: /paid <tg_id>")
-        return
-    target_id = int(parts[1])
-    await _confirm_paid(bot, target_id, by_admin=message.from_user.id)
-    await message.answer(f"✅ Оплата подтверждена для id {target_id}.")
-
-
+# NB: the /paid command is handled by handlers/tickets.py (it issues the pretix
+# ticket via the backend). Here we keep only the shared confirm used by the inline
+# "Подтвердить" button, now wired to issue + deliver the ticket too.
 async def _confirm_paid(bot: Bot, target_id: int, *, by_admin: int) -> None:
     user = await db.get_user(target_id)
     if not user:
@@ -180,3 +169,24 @@ async def _confirm_paid(bot: Bot, target_id: int, *, by_admin: int) -> None:
         await bot.send_message(target_id, content.PAID_CONFIRMED_USER)
     except Exception:
         log.info("Could not notify user %s of confirmation", target_id)
+    # Issue the pretix ticket via backend (also reflects paid+ticket to amoCRM) and deliver.
+    try:
+        base = config.LEAD_API_URL.split("/api/")[0]
+        hdr = {"X-Internal-Token": config.INTERNAL_TOKEN, "Content-Type": "application/json"}
+        async with aiohttp.ClientSession() as s:
+            async with s.get(base + "/api/reg/find", params={"q": str(target_id)}, headers=hdr,
+                             timeout=aiohttp.ClientTimeout(total=12)) as r:
+                f = await r.json()
+            if f.get("found"):
+                async with s.post(base + "/api/issue_ticket", json={"reg_id": f["reg"]["id"]},
+                                  headers=hdr, timeout=aiohttp.ClientTimeout(total=25)) as r2:
+                    t = await r2.json()
+                if t.get("ok"):
+                    cap = ("🎫 Ваш билет на саммит «Казань — Токио».\nКод: %s\n"
+                           "Предъявите QR на входе (вход однократный)." % t.get("human_code"))
+                    await bot.send_photo(target_id, BufferedInputFile(
+                        base64.b64decode(t["png_b64"]), "ticket-qr.png"), caption=cap)
+                    await bot.send_document(target_id, BufferedInputFile(
+                        base64.b64decode(t["pdf_b64"]), "ticket.pdf"))
+    except Exception as exc:
+        log.warning("confirm_paid: ticket issue/deliver failed: %s", exc)

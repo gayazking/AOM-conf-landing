@@ -1035,12 +1035,15 @@ def api_amo_event():
 
 
 @app.route("/amo/lead-webhook", methods=["POST"])
-def amo_lead_webhook():
-    """amoCRM -> backend: react to a manager-driven stage change (reverse)."""
+@app.route("/amo/lead-webhook/<path_key>", methods=["POST"])
+def amo_lead_webhook(path_key=None):
+    """amoCRM -> backend: react to a manager-driven stage change (reverse).
+    Secret accepted in the PATH (amoCRM may drop query strings) or ?key=."""
     import amo_sync
     cfg = load_env()
     secret = cfg.get("AMO_WEBHOOK_SECRET") or ""
-    if not secret or request.args.get("key", "") != secret:
+    provided = path_key or request.args.get("key", "")
+    if not secret or provided != secret:
         return jsonify({"ok": False, "error": "forbidden"}), 403
     form = request.form
     acc = form.get("account[id]") or ""
