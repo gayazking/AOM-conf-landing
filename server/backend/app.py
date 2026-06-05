@@ -718,6 +718,12 @@ def api_lead():
             reg.log_consent(_rid, "pdn", _VER, subject_phone=record.get("phone"),
                             subject_email=record.get("email"), ip=record.get("ip"),
                             user_agent=record.get("user_agent"), channel="web")
+        # push initial funnel state to amoCRM (stage + fields/tags/task)
+        try:
+            import amo_sync
+            amo_sync.forward(_rid, "registered")
+        except Exception as _e:
+            logger.error("amo forward(registered) failed: %s", _e)
     except Exception as _exc:
         logger.error("reg mirror failed: %s", _exc)
 
@@ -1001,6 +1007,63 @@ def _render_callback(ok, error_msg):
     return Response(html, status=status, mimetype="text/html; charset=utf-8")
 
 
+@app.route("/api/amo/event", methods=["POST"])
+def api_amo_event():
+    """Bot -> backend: emit a funnel event (sbp_shown, i_paid, ...) for amoCRM."""
+    import amo_sync
+    cfg = load_env()
+    tok = cfg.get("INTERNAL_TOKEN") or ""
+    if not tok or request.headers.get("X-Internal-Token", "") != tok:
+        return jsonify({"ok": False, "error": "unauthorized"}), 401
+    d = request.get_json(force=True, silent=True) or {}
+    event = d.get("event")
+    reg_id = d.get("reg_id")
+    if not reg_id and d.get("tg_id"):
+        try:
+            import reg as _reg
+            c = _reg._conn()
+            r = c.execute("SELECT id FROM registrations WHERE telegram_user_id=? ORDER BY created_at DESC LIMIT 1",
+                          (int(d["tg_id"]),)).fetchone()
+            c.close()
+            reg_id = r["id"] if r else None
+        except Exception:
+            reg_id = None
+    if not reg_id or not event:
+        return jsonify({"ok": False, "error": "bad_request"}), 400
+    amo_sync.forward(reg_id, event)
+    return jsonify({"ok": True})
+
+
+@app.route("/amo/lead-webhook", methods=["POST"])
+def amo_lead_webhook():
+    """amoCRM -> backend: react to a manager-driven stage change (reverse)."""
+    import amo_sync
+    cfg = load_env()
+    secret = cfg.get("AMO_WEBHOOK_SECRET") or ""
+    if not secret or request.args.get("key", "") != secret:
+        return jsonify({"ok": False, "error": "forbidden"}), 403
+    form = request.form
+    acc = form.get("account[id]") or ""
+    if acc and str(acc) != str(amo_sync.ACCOUNT_ID):
+        return jsonify({"ok": False, "error": "account_mismatch"}), 403
+    lead_id = form.get("leads[status][0][id]")
+    try:
+        new_status = int(form.get("leads[status][0][status_id]"))
+    except Exception:
+        return jsonify({"ok": True, "ignored": "no_status"})
+    if not lead_id:
+        return jsonify({"ok": True, "ignored": "no_lead"})
+    res = amo_sync.reverse_status_change(int(lead_id), new_status)
+    logger.info("amo reverse webhook lead=%s status=%s -> %s", lead_id, new_status, res)
+    return jsonify({"ok": True, **res})
+
+
+try:
+    import desk
+    desk.register(app)
+except Exception:
+    logger.exception("desk reg failed")
+
 try:
     import qrtrack
     qrtrack.register(app)
@@ -1012,6 +1075,13 @@ try:
     tickets.register(app)
 except Exception:
     logger.exception("tickets blueprint registration failed")
+
+try:
+    import amo_sync
+    amo_sync.init()
+    logger.info("amo_sync initialized")
+except Exception:
+    logger.exception("amo_sync init failed")
 
 
 if __name__ == "__main__":

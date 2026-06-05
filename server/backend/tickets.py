@@ -264,6 +264,13 @@ def api_issue_ticket():
     t = issue_ticket(reg_id)
     if not t:
         return jsonify(ok=False, error="issue_failed"), 500
+    # reflect to amoCRM: WIN + ticket fields
+    try:
+        import amo_sync
+        amo_sync.forward(reg_id, "paid")
+        amo_sync.forward(reg_id, "ticket_issued")
+    except Exception as exc:
+        log.error("amo forward (paid/ticket) failed: %s", exc)
     return jsonify(ok=True, **t)
 
 
@@ -344,6 +351,21 @@ def api_checkin():
         name = (info or {}).get("name")
         _scan(token[:24], {"ok": "ok", "already": "duplicate", "unpaid": "unpaid"}[res], gate, staff_name)
         if res == "ok":
+            # reflect check-in locally + to amoCRM (pretix is source of truth for the scan)
+            try:
+                import amo_sync
+                c = reg._conn()
+                rr = c.execute("SELECT id FROM registrations WHERE pretix_secret=?", (token,)).fetchone()
+                if rr:
+                    c.execute("UPDATE registrations SET checked_in_at=COALESCE(checked_in_at,?), checked_in_by=?, "
+                              "check_in_gate=?, status='checked_in', updated_at=? WHERE id=?",
+                              (_now(), staff_name, gate, _now(), rr["id"]))
+                    c.commit()
+                c.close()
+                if rr:
+                    amo_sync.forward(rr["id"], "checked_in")
+            except Exception as exc:
+                log.error("checkin reflect failed: %s", exc)
             return jsonify(result="ok", name=name)
         if res == "already":
             return jsonify(result="duplicate", name=name)
@@ -374,6 +396,11 @@ def api_checkin():
                       (row["id"], row.get("status"), "checked_in", _now(), staff_name or "door", "check-in"))
             c.commit()
             _scan(tid, "ok", gate, staff_name)
+            try:
+                import amo_sync
+                amo_sync.forward(row["id"], "checked_in")
+            except Exception as exc:
+                log.error("amo forward(checked_in) failed: %s", exc)
             return jsonify(result="ok", name=row.get("full_name"), package=row.get("package"))
         else:
             _scan(tid, "duplicate", gate, staff_name)
