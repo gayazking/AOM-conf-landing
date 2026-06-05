@@ -25,6 +25,8 @@ CB_PROGRAM = "menu:program"
 CB_PAY = "menu:pay"
 CB_REMIND = "menu:remind"
 CB_CONTACT = "menu:contact"
+CB_SATO = "menu:sato"
+CB_TRAVEL = "menu:travel"
 CB_PAY_PKG = "pay:"          # + package_key
 CB_I_PAID = "paid:claim:"    # + package_key (or 'none')
 CB_ADMIN_CONFIRM = "admin:confirm:"  # + tg_id
@@ -68,6 +70,8 @@ def main_menu_kb() -> InlineKeyboardMarkup:
                 InlineKeyboardButton(text=content.BTN_PROGRAM, callback_data=CB_PROGRAM),
             ],
             [InlineKeyboardButton(text=content.BTN_PAY, callback_data=CB_PAY)],
+            [InlineKeyboardButton(text=content.BTN_SATO, callback_data=CB_SATO)],
+            [InlineKeyboardButton(text=content.BTN_TRAVEL, callback_data=CB_TRAVEL)],
             [
                 InlineKeyboardButton(text=content.BTN_REMIND, callback_data=CB_REMIND),
                 InlineKeyboardButton(text=content.BTN_CONTACT, callback_data=CB_CONTACT),

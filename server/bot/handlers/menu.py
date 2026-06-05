@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 
 from aiogram import Bot, F, Router
-from aiogram.types import CallbackQuery
+from aiogram.types import CallbackQuery, FSInputFile
 
 import content
 import keyboards
@@ -81,4 +81,28 @@ async def set_reminder(cb: CallbackQuery) -> None:
         return
     await common.safe_edit_or_send(
         cb, content.REMIND_SET, reply_markup=keyboards.back_kb()
+    )
+
+
+@router.callback_query(F.data == keyboards.CB_SATO)
+async def show_sato(cb: CallbackQuery) -> None:
+    await common.safe_answer_callback(cb)
+    if not await _require_registered(cb):
+        return
+    try:
+        await cb.message.answer_photo(
+            FSInputFile(content.SATO_PHOTO), caption=content.SATO_CAPTION
+        )
+    except Exception:
+        log.warning("sato photo send failed", exc_info=True)
+    await cb.message.answer(content.SATO_BIO, reply_markup=keyboards.back_kb())
+
+
+@router.callback_query(F.data == keyboards.CB_TRAVEL)
+async def show_travel(cb: CallbackQuery) -> None:
+    await common.safe_answer_callback(cb)
+    if not await _require_registered(cb):
+        return
+    await common.safe_edit_or_send(
+        cb, content.TRAVEL_TEXT, reply_markup=keyboards.back_kb()
     )

@@ -13,7 +13,7 @@ import io
 import logging
 import secrets
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 import segno
 from flask import Blueprint, request, jsonify, Response
@@ -138,6 +138,19 @@ def _t(s):
         else:
             out.append(ch)
     return "".join(out)
+
+
+def _fmt_msk(iso):
+    """ISO/UTC -> 'дд.мм.гггг ЧЧ:ММ МСК' for ticket captions."""
+    if not iso:
+        return ""
+    try:
+        dt = datetime.fromisoformat(str(iso).replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone(timedelta(hours=3))).strftime("%d.%m.%Y %H:%M") + " МСК"
+    except Exception:
+        return ""
 
 
 def _email_ticket(cfg, to_email, pdf_bytes, png_bytes, human_code, name, package_label):
@@ -290,6 +303,9 @@ def issue_ticket(reg_id):
         pass
     return {
         "ticket_id": ticket_id, "human_code": human_code, "pretix_order": pretix_code, "emailed": emailed,
+        "name": row.get("full_name"),
+        "tariff_label": _PKG_LABEL.get(str(row.get("package")), row.get("package")),
+        "paid_at_h": _fmt_msk(row.get("paid_at") or _now()),
         "png_b64": base64.b64encode(png).decode(),
         "pdf_b64": base64.b64encode(pdf).decode(),
     }

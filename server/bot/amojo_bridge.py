@@ -144,10 +144,10 @@ def _make_app(bot) -> web.Application:
             if not t.get("ok"):
                 return web.json_response({"ok": False, "error": "issue_failed"}, status=502)
             import base64
+            import content
             from aiogram.types import BufferedInputFile
 
-            cap = ("🎫 Ваш билет на саммит «Казань — Токио».\nКод: %s\n"
-                   "Предъявите QR на входе (вход однократный)." % t.get("human_code"))
+            cap = content.ticket_caption(t)
             await bot.send_photo(int(buyer), BufferedInputFile(
                 base64.b64decode(t["png_b64"]), "ticket-qr.png"), caption=cap)
             await bot.send_document(int(buyer), BufferedInputFile(

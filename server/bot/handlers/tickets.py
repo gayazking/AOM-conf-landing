@@ -15,6 +15,7 @@ from aiogram.filters import Command, CommandObject
 from aiogram.types import Message, BufferedInputFile
 
 import config
+import content
 
 log = logging.getLogger(__name__)
 router = Router(name="tickets")
@@ -43,10 +44,10 @@ async def _issue(reg_id):
             return await r.json()
 
 
-async def _deliver(bot, tg_id, png_b64, pdf_b64, human_code, name, package):
-    cap = "🎫 Ваш билет на саммит «Казань — Токио».\nКод: %s\nПредъявите QR на входе (вход однократный)." % human_code
-    await bot.send_photo(tg_id, BufferedInputFile(base64.b64decode(png_b64), "ticket-qr.png"), caption=cap)
-    await bot.send_document(tg_id, BufferedInputFile(base64.b64decode(pdf_b64), "ticket.pdf"))
+async def _deliver(bot, tg_id, t):
+    cap = content.ticket_caption(t)
+    await bot.send_photo(tg_id, BufferedInputFile(base64.b64decode(t["png_b64"]), "ticket-qr.png"), caption=cap)
+    await bot.send_document(tg_id, BufferedInputFile(base64.b64decode(t["pdf_b64"]), "ticket.pdf"))
 
 
 @router.message(Command("paid"))
@@ -77,8 +78,7 @@ async def cmd_paid(message: Message, command: CommandObject, bot):
     buyer_tg = r.get("telegram_user_id")
     if buyer_tg:
         try:
-            await _deliver(bot, int(buyer_tg), t["png_b64"], t["pdf_b64"], t["human_code"],
-                           r.get("full_name"), r.get("package"))
+            await _deliver(bot, int(buyer_tg), t)
             await message.answer("✅ Оплата отмечена, билет отправлен клиенту %s (tg %s). Код: %s" %
                                  (r.get("full_name"), buyer_tg, t["human_code"]))
         except Exception as exc:
@@ -94,8 +94,7 @@ async def cmd_paid(message: Message, command: CommandObject, bot):
     else:
         await message.answer("Билет выпущен (код %s). У клиента нет Telegram — отправляю билет вам, перешлите/на email." % t["human_code"])
         try:
-            await _deliver(bot, message.from_user.id, t["png_b64"], t["pdf_b64"], t["human_code"],
-                           r.get("full_name"), r.get("package"))
+            await _deliver(bot, message.from_user.id, t)
         except Exception:
             pass
 
@@ -117,8 +116,7 @@ async def cmd_myticket(message: Message, bot):
     try:
         t = await _issue(r["id"])
         if t.get("ok"):
-            await _deliver(bot, message.from_user.id, t["png_b64"], t["pdf_b64"], t["human_code"],
-                           r.get("full_name"), r.get("package"))
+            await _deliver(bot, message.from_user.id, t)
         else:
             await message.answer("Не удалось получить билет: %s" % t.get("error"))
     except Exception:

@@ -182,8 +182,7 @@ async def _confirm_paid(bot: Bot, target_id: int, *, by_admin: int) -> None:
                                   headers=hdr, timeout=aiohttp.ClientTimeout(total=25)) as r2:
                     t = await r2.json()
                 if t.get("ok"):
-                    cap = ("🎫 Ваш билет на саммит «Казань — Токио».\nКод: %s\n"
-                           "Предъявите QR на входе (вход однократный)." % t.get("human_code"))
+                    cap = content.ticket_caption(t)
                     await bot.send_photo(target_id, BufferedInputFile(
                         base64.b64decode(t["png_b64"]), "ticket-qr.png"), caption=cap)
                     await bot.send_document(target_id, BufferedInputFile(
