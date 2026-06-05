@@ -432,11 +432,28 @@ def _field_value(lead, name):
     return None
 
 
+def _flag_no_tariff(lead_id):
+    """Create the 'specify tariff' task AT MOST ONCE (guarded by a tag), so a
+    no-tariff confirmation can never loop on update_lead webhooks. Returns
+    'flagged' (first time) or 'skip'."""
+    lead = _get_lead(lead_id)
+    tags = [t["name"] for t in (lead or {}).get("_embedded", {}).get("tags", [])]
+    if "нужен-тариф" in tags:
+        return "skip"
+    patch_lead(lead_id, None, ["нужен-тариф"])
+    create_task(lead_id, "Оплата отмечена, но «Тариф» не выбран — укажите тариф в карточке, "
+                "и билет выпустится автоматически", 1, 7200)
+    return "flagged"
+
+
 def _issue_win(reg_id, lead_id, row):
     """Confirmed payment -> resolve tariff, issue pretix ticket (backend also
     e-mails the PDF), deliver to Telegram, and let the automation move the card to
     «Оплачено». Idempotent. Shared by the drag-to-WIN and «Статус оплаты=Оплачено»
     triggers."""
+    # idempotency: never re-issue / re-deliver an already-ticketed registration
+    if row.get("status") in ("ticket_issued", "checked_in") and row.get("pretix_order_code"):
+        return {"action": "already_done", "reg_id": reg_id}
     pkg = str(row.get("package") or "")
     if pkg not in _TARIFF:
         pkg = _tariff_from_lead(lead_id)
@@ -451,8 +468,7 @@ def _issue_win(reg_id, lead_id, row):
                 pass
             row["package"] = pkg
     if pkg not in _TARIFF:
-        create_task(lead_id, "Выберите «Тариф» в карточке — авто-билет не выпущен (тариф не указан)", 1, 1800)
-        return {"action": "win_no_package", "reg_id": reg_id}
+        return {"action": "win_no_package_" + _flag_no_tariff(lead_id), "reg_id": reg_id}
     try:
         reg.set_status(reg_id, "paid", actor="amo:auto", reason="payment confirmed", force=True)
     except Exception:
@@ -489,6 +505,16 @@ def reverse_field_paid(lead_id):
         _attach_lead(row["id"], lead_id)
     if row.get("status") in ("paid", "ticket_issued", "checked_in") and row.get("pretix_order_code"):
         return {"action": "already_done", "reg_id": row["id"]}
+    # No tariff yet -> flag ONCE via tag, never loop creating tasks (the storm fix).
+    pkg = str(row.get("package") or "")
+    if pkg not in _TARIFF and _tariff_from_lead(lead_id) not in _TARIFF:
+        tags = [t["name"] for t in lead.get("_embedded", {}).get("tags", [])]
+        if "нужен-тариф" in tags:
+            return {"action": "win_no_package_skip"}
+        patch_lead(lead_id, None, ["нужен-тариф"])
+        create_task(lead_id, "Оплата отмечена, но «Тариф» не выбран — укажите тариф в карточке, "
+                    "и билет выпустится автоматически", 1, 7200)
+        return {"action": "win_no_package_flagged", "reg_id": row["id"]}
     return _issue_win(row["id"], lead_id, row)
 
 
