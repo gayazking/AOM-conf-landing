@@ -708,7 +708,13 @@ def api_lead():
     # Mirror into the local operational registrations store + consent audit (never fatal).
     try:
         import reg
-        _rid = reg.upsert_registration(dict(record, amocrm_lead_id=lead_id, source=record.get("source") or "web"))
+        _tg = payload.get("tg_id") or payload.get("telegram_user_id")
+        _rid = reg.upsert_registration(dict(
+            record, amocrm_lead_id=lead_id,
+            source=("bot" if _tg else "web"),
+            telegram_user_id=_tg,
+            telegram_username=payload.get("username") or payload.get("telegram_username"),
+        ))
         _VER = "Редакция №1 от 01.06.2026"
         if record.get("consent_oferta"):
             reg.log_consent(_rid, "oferta", _VER, subject_phone=record.get("phone"),

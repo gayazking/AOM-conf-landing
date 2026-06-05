@@ -391,12 +391,16 @@ def api_kassa_webhook():
         try:
             import json as _json
             import urllib.request
+            from urllib.parse import urlparse
+            u = urlparse(bot_url)
+            ticket_url = "%s://%s/internal/deliver_ticket" % (u.scheme, u.netloc)
             req = urllib.request.Request(
-                bot_url.rstrip("/") + "/deliver_ticket",
-                data=_json.dumps({"reg_id": reg_id, "token": cfg.get("INTERNAL_TOKEN", "")}).encode(),
-                headers={"Content-Type": "application/json"})
-            urllib.request.urlopen(req, timeout=8)
-            delivered = True
+                ticket_url,
+                data=_json.dumps({"reg_id": reg_id}).encode(),
+                headers={"Content-Type": "application/json",
+                         "X-Internal-Token": cfg.get("INTERNAL_TOKEN", "")})
+            resp = urllib.request.urlopen(req, timeout=15)
+            delivered = '"ok": true' in resp.read().decode("utf-8", "replace")
         except Exception as exc:
             log.warning("kassa webhook bot deliver failed: %s", exc)
     return jsonify(ok=True, pretix_order=t.get("pretix_order"), human_code=t.get("human_code"), delivered=delivered)

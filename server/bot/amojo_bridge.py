@@ -112,7 +112,53 @@ def _make_app(bot) -> web.Application:
             log.debug("could not append manager reply to AI memory for %s", tg_id)
         return web.json_response({"ok": True})
 
+    async def deliver_ticket(request: web.Request) -> web.Response:
+        """Backend asks the bot to push a buyer's ticket (QR + PDF) to Telegram.
+        Body: {reg_id|tg_id, token}. Fetches the ticket from the backend (idempotent)."""
+        if not _check_token(request):
+            return web.json_response({"ok": False, "error": "unauthorized"}, status=401)
+        try:
+            data = await request.json()
+        except Exception:
+            return web.json_response({"ok": False, "error": "bad_json"}, status=400)
+        reg_id = data.get("reg_id")
+        tg_id = data.get("tg_id")
+        if not reg_id and not tg_id:
+            return web.json_response({"ok": False, "error": "missing"}, status=400)
+        base = config.LEAD_API_URL.split("/api/")[0]
+        hdr = {"X-Internal-Token": config.INTERNAL_TOKEN, "Content-Type": "application/json"}
+        try:
+            async with aiohttp.ClientSession() as s:
+                async with s.get(base + "/api/reg/find", params={"q": str(reg_id or tg_id)},
+                                 headers=hdr, timeout=aiohttp.ClientTimeout(total=12)) as r:
+                    f = await r.json()
+                if not f.get("found"):
+                    return web.json_response({"ok": False, "error": "reg_not_found"}, status=404)
+                reg = f["reg"]
+                buyer = reg.get("telegram_user_id") or tg_id
+                if not buyer:
+                    return web.json_response({"ok": False, "error": "no_tg"})
+                async with s.post(base + "/api/issue_ticket", json={"reg_id": reg["id"]},
+                                  headers=hdr, timeout=aiohttp.ClientTimeout(total=25)) as r2:
+                    t = await r2.json()
+            if not t.get("ok"):
+                return web.json_response({"ok": False, "error": "issue_failed"}, status=502)
+            import base64
+            from aiogram.types import BufferedInputFile
+
+            cap = ("🎫 Ваш билет на саммит «Казань — Токио».\nКод: %s\n"
+                   "Предъявите QR на входе (вход однократный)." % t.get("human_code"))
+            await bot.send_photo(int(buyer), BufferedInputFile(
+                base64.b64decode(t["png_b64"]), "ticket-qr.png"), caption=cap)
+            await bot.send_document(int(buyer), BufferedInputFile(
+                base64.b64decode(t["pdf_b64"]), "ticket.pdf"))
+            return web.json_response({"ok": True})
+        except Exception as exc:
+            log.warning("internal deliver_ticket failed: %s", exc)
+            return web.json_response({"ok": False, "error": "exception"}, status=502)
+
     app.router.add_post("/internal/deliver", deliver)
+    app.router.add_post("/internal/deliver_ticket", deliver_ticket)
     return app
 
 
@@ -122,17 +168,10 @@ async def run_internal_server(bot, stop: asyncio.Event) -> None:
     Mirrors lead.retry_worker lifecycle: started as a task in bot.main() and
     cancelled in the finally block. No-op when amoJo is disabled.
     """
-    if not config.AMOJO_ENABLED:
-        log.info("amojo disabled — internal delivery server not started")
-        return
+    # The internal server now serves ticket delivery (always needed) AND the amoJo
+    # chat bridge. Start it whenever INTERNAL_TOKEN is set, regardless of amoJo.
     if not config.INTERNAL_TOKEN:
-        # Should not happen (AMOJO_ENABLED is gated on INTERNAL_TOKEN in config),
-        # but make a misconfiguration loud instead of silently 401-ing every
-        # manager->client delivery.
-        log.error(
-            "AMOJO_ENABLED but INTERNAL_TOKEN is empty — refusing to start the "
-            "internal delivery server (all deliveries would be rejected)."
-        )
+        log.info("INTERNAL_TOKEN not set — internal server (ticket+chat) not started")
         return
     host, port = config.internal_listen_host_port()
     app = _make_app(bot)

@@ -522,7 +522,8 @@ def reverse_status_change(lead_id, new_status, phone=None):
 
 
 def _deliver_via_bot(reg_id):
-    """Best-effort: ask the bot to push the ticket to the buyer's Telegram."""
+    """Best-effort: ask the bot to push the ticket to the buyer's Telegram.
+    Returns True only if the bot actually delivered (ok:true)."""
     cfg = _cfg()
     bot_url = cfg.get("BOT_INTERNAL_URL") or ""
     if not bot_url:
@@ -530,12 +531,17 @@ def _deliver_via_bot(reg_id):
     try:
         import json
         import urllib.request
+        from urllib.parse import urlparse
+        u = urlparse(bot_url)
+        ticket_url = "%s://%s/internal/deliver_ticket" % (u.scheme, u.netloc)
         req = urllib.request.Request(
-            bot_url.rstrip("/") + "/deliver_ticket",
-            data=json.dumps({"reg_id": reg_id, "token": cfg.get("INTERNAL_TOKEN", "")}).encode(),
-            headers={"Content-Type": "application/json"})
-        urllib.request.urlopen(req, timeout=8)
-        return True
+            ticket_url,
+            data=json.dumps({"reg_id": reg_id}).encode(),
+            headers={"Content-Type": "application/json",
+                     "X-Internal-Token": cfg.get("INTERNAL_TOKEN", "")})
+        resp = urllib.request.urlopen(req, timeout=15)
+        body = resp.read().decode("utf-8", "replace")
+        return '"ok": true' in body or '"ok":true' in body
     except Exception as exc:
         log.warning("amo reverse: bot deliver failed: %s", exc)
         return False
