@@ -1036,6 +1036,19 @@ def api_amo_event():
             reg_id = None
     if not reg_id or not event:
         return jsonify({"ok": False, "error": "bad_request"}), 400
+    # carry the tariff the user chose in the bot onto the registration, so a later
+    # paid-confirmation can auto-issue the ticket without a "no tariff" task.
+    package = str(d.get("package") or "").strip()
+    if package in ("500", "800", "1000", "1800"):
+        try:
+            import reg as _reg
+            c = _reg._conn()
+            c.execute("UPDATE registrations SET package=?, price_eur=COALESCE(price_eur,?), updated_at=? WHERE id=?",
+                      (package, int(package), now_iso(), reg_id))
+            c.commit()
+            c.close()
+        except Exception as exc:
+            logger.error("amo/event package set failed: %s", exc)
     amo_sync.forward(reg_id, event)
     return jsonify({"ok": True})
 

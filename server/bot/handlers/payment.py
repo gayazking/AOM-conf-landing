@@ -24,14 +24,24 @@ log = logging.getLogger(__name__)
 router = Router(name="payment")
 
 
-async def _emit_amo(tg_id: int, event: str) -> None:
+def _pkg_digits(key: str) -> str | None:
+    """Bot package key -> numeric tariff '500'/'800'/'1000'/'1800' (from price)."""
+    pkg = content.PACKAGES.get(key) or {}
+    d = "".join(c for c in str(pkg.get("price", "")) if c.isdigit())
+    return d or None
+
+
+async def _emit_amo(tg_id: int, event: str, package: str | None = None) -> None:
     """Best-effort: tell the backend to reflect a funnel event into amoCRM."""
     try:
         base = config.LEAD_API_URL.split("/api/")[0]
+        body = {"tg_id": tg_id, "event": event}
+        if package:
+            body["package"] = package
         async with aiohttp.ClientSession() as s:
             await s.post(
                 base + "/api/amo/event",
-                json={"tg_id": tg_id, "event": event},
+                json=body,
                 headers={"X-Internal-Token": config.INTERNAL_TOKEN, "Content-Type": "application/json"},
                 timeout=aiohttp.ClientTimeout(total=8),
             )
@@ -77,7 +87,7 @@ async def pay_package(cb: CallbackQuery) -> None:
         cb, text, reply_markup=keyboards.pay_actions_kb(key)
     )
     if url:
-        await _emit_amo(cb.from_user.id, "sbp_shown")
+        await _emit_amo(cb.from_user.id, "sbp_shown", _pkg_digits(key))
 
 
 @router.callback_query(F.data.startswith(keyboards.CB_I_PAID))
@@ -107,7 +117,7 @@ async def i_paid(cb: CallbackQuery, bot: Bot) -> None:
     # not nagged with scarcity/last-call during the verification window.
     await db.set_funnel_stage(user.id, "paid_pending")
     await funnel.stop_drip(user.id)
-    await _emit_amo(user.id, "i_paid")
+    await _emit_amo(user.id, "i_paid", _pkg_digits(key))
 
     await common.safe_edit_or_send(
         cb, content.PAID_PENDING_USER, reply_markup=keyboards.pay_actions_kb(key)
