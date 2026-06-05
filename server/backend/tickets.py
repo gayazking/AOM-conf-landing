@@ -22,6 +22,20 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
 from reportlab.pdfgen import canvas
 from reportlab.lib.utils import ImageReader
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+import os as _os
+_FONT, _FONTB = "Helvetica", "Helvetica-Bold"
+try:
+    _dv="/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+    _db="/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+    if _os.path.exists(_dv):
+        pdfmetrics.registerFont(TTFont("DejaVu", _dv)); _FONT="DejaVu"
+        if _os.path.exists(_db):
+            pdfmetrics.registerFont(TTFont("DejaVu-Bold", _db)); _FONTB="DejaVu-Bold"
+        else: _FONTB="DejaVu"
+except Exception:
+    pass
 
 import reg
 
@@ -29,6 +43,7 @@ log = logging.getLogger("sato")
 bp = Blueprint("tickets", __name__)
 SALT = "sato-ticket-2026"
 _HUMAN = "ABCDEFGHJKLMNPQRTUVWXYZ23456789"
+_PKG_LABEL = {"500": "Теория · онлайн", "800": "Теория · оффлайн", "1000": "Практика · оффлайн", "1800": "Полный пакет (4 дня)"}
 
 
 def _cfg():
@@ -66,42 +81,37 @@ def _render_pdf(cfg, full_name, package_label, price_eur, human_code, qr_png):
     c = canvas.Canvas(buf, pagesize=A4)
     W, H = A4
     gold = (0.788, 0.647, 0.447)
-    c.setFillColorRGB(0.06, 0.067, 0.082)
-    c.rect(0, 0, W, H, fill=1, stroke=0)
-    c.setFillColorRGB(*gold)
-    c.setFont("Helvetica-Bold", 26)
-    c.drawCentredString(W / 2, H - 60 * mm, "KAZAN — TOKYO")
-    c.setFillColorRGB(0.9, 0.9, 0.93)
-    c.setFont("Helvetica", 12)
-    c.drawCentredString(W / 2, H - 70 * mm, "Mezhdunarodnyy stomatologicheskiy sammit 2026")
-    c.drawCentredString(W / 2, H - 78 * mm, "Prof. Sadao Sato")
-    # QR
-    qr = ImageReader(io.BytesIO(qr_png))
-    qs = 70 * mm
-    c.drawImage(qr, (W - qs) / 2, H / 2 - 10 * mm, qs, qs, mask="auto")
-    # attendee + package
-    c.setFillColorRGB(1, 1, 1)
-    c.setFont("Helvetica-Bold", 16)
-    c.drawCentredString(W / 2, H / 2 - 25 * mm, _t(full_name or "Uchastnik"))
-    c.setFillColorRGB(*gold)
-    c.setFont("Helvetica", 13)
-    pl = package_label or ""
+    c.setFillColorRGB(0.055, 0.067, 0.082); c.rect(0, 0, W, H, fill=1, stroke=0)
+    c.setStrokeColorRGB(*gold); c.setLineWidth(1.2); c.rect(12*mm, 12*mm, W-24*mm, H-24*mm, fill=0, stroke=1)
+    c.setFillColorRGB(*gold); c.setFont(_FONTB, 30)
+    c.drawCentredString(W/2, H-52*mm, "КАЗАНЬ — ТОКИО")
+    c.setFillColorRGB(0.9, 0.9, 0.93); c.setFont(_FONT, 13)
+    c.drawCentredString(W/2, H-63*mm, "Международный стоматологический саммит 2026")
+    c.setFillColorRGB(0.68, 0.71, 0.77); c.setFont(_FONT, 11)
+    c.drawCentredString(W/2, H-71*mm, "Профессор Садао Сато и его команда")
+    c.setFillColorRGB(*gold); c.setFont(_FONT, 13); c.drawCentredString(W/2, H-79*mm, "ЭЛЕКТРОННЫЙ БИЛЕТ")
+    qs = 70*mm; qx = (W-qs)/2; qy = H/2 - 18*mm
+    c.setFillColorRGB(1, 1, 1); c.roundRect(qx-6*mm, qy-6*mm, qs+12*mm, qs+12*mm, 4*mm, fill=1, stroke=0)
+    c.drawImage(ImageReader(io.BytesIO(qr_png)), qx, qy, qs, qs, mask="auto")
+    c.setFillColorRGB(1, 1, 1); c.setFont(_FONTB, 18)
+    c.drawCentredString(W/2, qy-18*mm, full_name or "Участник")
+    c.setFillColorRGB(*gold); c.setFont(_FONT, 13)
+    pl = _PKG_LABEL.get(str(package_label), package_label or "Участие")
     if price_eur:
-        pl = "%s — %s EUR" % (pl, price_eur)
-    c.drawCentredString(W / 2, H / 2 - 33 * mm, _t(pl))
-    c.setFillColorRGB(0.68, 0.71, 0.77)
-    c.setFont("Helvetica", 11)
-    y = H / 2 - 45 * mm
-    for line in (("Daty: " + cfg.get("EVENT_DATES", "")) if cfg.get("EVENT_DATES") else None,
-                 ("Mesto: " + cfg.get("VENUE", "")) if cfg.get("VENUE") else None,
-                 "Kod bileta: " + human_code,
-                 "Vkhod odnokratnyy. Pred'yavite QR na vkhode."):
-        if line:
-            c.drawCentredString(W / 2, y, _t(line))
-            y -= 7 * mm
-    c.showPage()
-    c.save()
-    return buf.getvalue()
+        pl = "%s — %s €" % (pl, price_eur)
+    c.drawCentredString(W/2, qy-27*mm, pl)
+    c.setFillColorRGB(0.72, 0.75, 0.8); c.setFont(_FONT, 11)
+    y = qy-40*mm
+    lines = []
+    if cfg.get("EVENT_DATES"): lines.append("Даты: " + cfg.get("EVENT_DATES"))
+    if cfg.get("VENUE"): lines.append("Место: " + cfg.get("VENUE"))
+    lines.append("Код билета: " + human_code)
+    lines.append("Вход однократный. Предъявите QR на входе.")
+    for ln in lines:
+        c.drawCentredString(W/2, y, ln); y -= 7*mm
+    c.setFillColorRGB(0.5, 0.53, 0.6); c.setFont(_FONT, 9)
+    c.drawCentredString(W/2, 20*mm, "sadaosato.pro")
+    c.showPage(); c.save(); return buf.getvalue()
 
 
 def _t(s):

@@ -1,9 +1,11 @@
 {
-  "title": "Sato — Регистрации саммита «Казань — Токио»",
-  "description_html": "Операционная база регистраций. amoCRM — воронка продаж; здесь — статусы, оплаты, билеты, чек-ин.",
+  "title": "Sato — Регистрации + QR-аналитика",
   "databases": {"registrations": {"tables": {
     "registrations": {"sort_desc": "created_at", "facets": ["status", "package", "source"]},
+    "qr_scans": {"sort_desc": "ts", "facets": ["variant", "channel", "device"]},
+    "qr_codes": {"sort": "code"},
     "consent_log": {"sort_desc": "ts"},
+    "scan_log": {"sort_desc": "ts"},
     "status_history": {"sort_desc": "ts"}
   }}}
 }

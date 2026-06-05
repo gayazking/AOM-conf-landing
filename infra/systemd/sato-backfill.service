@@ -1,0 +1,11 @@
+[Unit]
+Description=Sato lead backfill (flush pending.jsonl to amoCRM)
+After=network-online.target
+[Service]
+Type=oneshot
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/sato
+Environment=PYTHONPATH=/opt/sato
+Environment=HOME=/var/lib/sato
+ExecStart=/opt/sato/venv/bin/python /opt/sato/backfill.py

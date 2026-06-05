@@ -1002,6 +1002,12 @@ def _render_callback(ok, error_msg):
 
 
 try:
+    import qrtrack
+    qrtrack.register(app)
+except Exception:
+    logger.exception("qrtrack reg failed")
+
+try:
     import tickets
     tickets.register(app)
 except Exception:
