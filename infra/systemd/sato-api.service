@@ -1,0 +1,26 @@
+[Unit]
+Description=Sato conference landing — lead-capture API (gunicorn)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/sato
+Environment=PYTHONUNBUFFERED=1
+Environment=HOME=/var/lib/sato
+# Use the project virtualenv if present, otherwise system gunicorn.
+ExecStart=/opt/sato/venv/bin/gunicorn -w 2 -b 127.0.0.1:8081 --access-logfile - --error-logfile - app:app
+Restart=always
+RestartSec=3
+
+# Hardening (relaxed enough to write to /var/lib/sato and read /etc/sato).
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ReadWritePaths=/var/lib/sato
+ReadOnlyPaths=/etc/sato
+
+[Install]
+WantedBy=multi-user.target

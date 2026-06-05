@@ -1,0 +1,9 @@
+{
+  "title": "Sato — Регистрации саммита «Казань — Токио»",
+  "description_html": "Операционная база регистраций. amoCRM — воронка продаж; здесь — статусы, оплаты, билеты, чек-ин.",
+  "databases": {"registrations": {"tables": {
+    "registrations": {"sort_desc": "created_at", "facets": ["status", "package", "source"]},
+    "consent_log": {"sort_desc": "ts"},
+    "status_history": {"sort_desc": "ts"}
+  }}}
+}

@@ -1,0 +1,16 @@
+[Unit]
+Description=Datasette admin GUI for Sato registrations
+After=network.target
+[Service]
+User=www-data
+Group=www-data
+ExecStart=/opt/datasette-venv/bin/datasette serve /var/lib/sato/registrations.sqlite3 \
+  --host 127.0.0.1 --port 8001 -m /etc/datasette/metadata.json \
+  --setting base_url /admin/ --setting num_sql_threads 3 --setting sql_time_limit_ms 3000 \
+  --setting allow_download off
+Restart=on-failure
+RestartSec=5
+MemoryMax=220M
+NoNewPrivileges=true
+[Install]
+WantedBy=multi-user.target

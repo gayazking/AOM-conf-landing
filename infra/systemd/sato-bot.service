@@ -1,0 +1,56 @@
+[Unit]
+Description=SATO Summit Telegram Bot (aiogram 3.x, long-polling)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Dedicated unprivileged user so the bot token in /etc/sato-bot/bot.env is NOT
+# reachable from the web stack (the lead backend / nginx run as www-data).
+# Create it once: sudo useradd --system --no-create-home --shell /usr/sbin/nologin sato-bot
+User=sato-bot
+Group=sato-bot
+WorkingDirectory=/opt/sato-bot
+
+# Secrets & config are provided as environment variables (read in config.py).
+EnvironmentFile=/etc/sato-bot/bot.env
+
+ExecStart=/opt/sato-bot/venv/bin/python /opt/sato-bot/bot.py
+
+Restart=always
+RestartSec=5
+TimeoutStopSec=20
+
+# Logs go to journald (the app logs to stdout).
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=sato-bot
+
+# --- Hardening ---
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+CapabilityBoundingSet=
+AmbientCapabilities=
+UMask=0077
+# The only writable path the bot needs (SQLite DB + WAL files).
+ReadWritePaths=/var/lib/sato-bot
+
+[Install]
+WantedBy=multi-user.target

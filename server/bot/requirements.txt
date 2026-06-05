@@ -1,0 +1,6 @@
+aiogram>=3.7,<4.0
+APScheduler>=3.10,<4.0
+aiosqlite>=0.20
+aiohttp>=3.9
+openai>=1.99,<2.0
+tiktoken>=0.7

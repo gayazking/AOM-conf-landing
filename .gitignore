@@ -1,0 +1,24 @@
+# secrets / runtime — NEVER commit
+*.env
+!*.env.example
+*_tokens.json
+*.sqlite3
+*.sqlite3-*
+*.log
+leads.jsonl
+pending.jsonl
+amojo_state.json
+amojo_map.sqlite
+# python
+__pycache__/
+*.pyc
+venv/
+*/venv/
+# backups / scratch
+*.bak
+*.bak-*
+*.bak[0-9]*
+_ct/
+*_codepull.tgz
+sato-bot-ai.py.deployed
+.DS_Store

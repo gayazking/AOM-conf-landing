@@ -1,0 +1,34 @@
+# Sato lead-capture API — nginx reverse proxy snippet.
+# Include this INSIDE the `server { ... }` block of the sadaosato.pro vhost
+# (the HTTPS / port 443 server), e.g.:
+#
+#   server {
+#       server_name sadaosato.pro www.sadaosato.pro;
+#       listen 443 ssl;
+#       ...
+#       include /opt/sato/nginx-api.snippet;
+#   }
+#
+# The API listens on 127.0.0.1:8081 (gunicorn).
+
+location /api/ {
+    proxy_pass         http://127.0.0.1:8081;
+    proxy_http_version 1.1;
+    proxy_set_header   Host              $host;
+    proxy_set_header   X-Real-IP         $remote_addr;
+    proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+    proxy_set_header   X-Forwarded-Proto $scheme;
+    proxy_read_timeout 30s;
+    proxy_connect_timeout 10s;
+}
+
+location /amo/ {
+    proxy_pass         http://127.0.0.1:8081;
+    proxy_http_version 1.1;
+    proxy_set_header   Host              $host;
+    proxy_set_header   X-Real-IP         $remote_addr;
+    proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+    proxy_set_header   X-Forwarded-Proto $scheme;
+    proxy_read_timeout 30s;
+    proxy_connect_timeout 10s;
+}
