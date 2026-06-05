@@ -4,7 +4,7 @@
 #  defaults -> amqp broker + empty ALLOWED_HOSTS -> HTTP 400 on every request.)
 [pretix]
 instance_name=Казань — Токио 2026
-url=https://sadaosato.pro/pretix
+url=https://tickets.sadaosato.pro
 currency=EUR
 datadir=/data
 trust_x_forwarded_for=on

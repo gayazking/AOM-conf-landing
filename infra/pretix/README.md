@@ -1,6 +1,11 @@
 # pretix — развёртывание (self-hosted, Docker)
 
-Прод: сервер `31.56.196.8`, субпуть `https://sadaosato.pro/pretix/`.
+Прод: сервер `31.56.196.8`, **отдельный поддомен** `https://tickets.sadaosato.pro/`.
+
+> ⚠️ pretix НЕ умеет работать в субпути (`/pretix/`): он не выставляет
+> `FORCE_SCRIPT_NAME`, поэтому редиректы/`STATIC_URL=/static/` идут без префикса,
+> а `/api/` конфликтует с бэкендом. Поэтому — отдельный origin (поддомен на 443).
+> Порт `:8443` не годится: хостинг блокирует не-443 снаружи.
 
 ## 1. Контейнеры
 
@@ -14,20 +19,28 @@ docker compose pull && docker compose up -d
 # первый старт сам прогоняет миграции (~1–2 мин), затем gunicorn слушает :8345
 ```
 
-## 2. nginx (субпуть, префикс снимается trailing-slash'ем)
+## 2. nginx (отдельный vhost поддомена, БЕЗ снятия префикса)
+
+`infra/nginx/tickets.sadaosato.pro` — vhost проксирует корень origin на pretix:
 
 ```nginx
-location = /pretix { return 301 /pretix/; }
-location ^~ /pretix/ {                 # ^~ важен: бьёт regex статики
-    proxy_pass http://127.0.0.1:8345/; # trailing slash снимает /pretix -> upstream видит /control/...
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-    client_max_body_size 25M;
+server {
+    server_name tickets.sadaosato.pro;
+    listen 443 ssl;                       # cert от certbot --nginx -d tickets.sadaosato.pro
+    location / {
+        proxy_pass http://127.0.0.1:8345; # БЕЗ trailing slash — путь как есть
+        proxy_set_header Host $host;       # = tickets.sadaosato.pro (ALLOWED_HOSTS)
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+        client_max_body_size 25M;
+    }
 }
 ```
-(Уже включено в `infra/nginx/sadaosato.pro`.)
+
+Cert: `certbot --nginx -d tickets.sadaosato.pro`. Старый `/pretix/` на главном
+домене редиректит на поддомен (см. `infra/nginx/sadaosato.pro`). Бэкенд ходит в
+API на loopback `127.0.0.1:8345` с `Host: tickets.sadaosato.pro` (env `PRETIX_HOST`).
 
 ## 3. Событие/товары/токен/устройства
 

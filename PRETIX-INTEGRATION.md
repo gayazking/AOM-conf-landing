@@ -9,8 +9,8 @@
 
 | Компонент | Адрес / путь |
 |---|---|
-| Админка pretix | https://sadaosato.pro/pretix/control/ |
-| API pretix | https://sadaosato.pro/pretix/api/v1/ (бэкенд ходит на `127.0.0.1:8345`, Host = `sadaosato.pro`) |
+| Админка pretix | https://tickets.sadaosato.pro/control/ |
+| API pretix | https://tickets.sadaosato.pro/api/v1/ (бэкенд ходит на `127.0.0.1:8345`, Host = `tickets.sadaosato.pro`) |
 | Docker (compose+cfg) | `/opt/pretix/` (на сервере) |
 | Логин админа | `admin@sadaosato.pro` (пароль — в `/opt/pretix/admin_pw.txt`) |
 | API-токен команды | в `/etc/sato/amo.env` → `PRETIX_TOKEN` |
