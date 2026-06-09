@@ -269,7 +269,9 @@ def stats():
  h2{{font-size:15px;color:#c3cde0;margin:0 0 8px}} a{{color:#5aa2ff}}
 </style>
 <h1>QR-аналитика — Казань-Токио 2026</h1>
-<div class=sub>период: {period} · {flt} · <a href="?token={tok}&format=json">JSON</a> ·
+<div class=sub>период: {period} · {flt} ·
+ <a href="/api/qr/funnel?token={tok}">воронка до оплаты →</a> ·
+ <a href="?token={tok}&format=json">JSON</a> ·
  <a href="?token={tok}">всё</a> · <a href="?token={tok}&days=7">7 дн.</a> · <a href="?token={tok}&days=1">сутки</a></div>
 <div class=cards>
  <div class=card><div class=n>{tot_hits}</div><div class=k>переходов (люди)</div></div>
@@ -289,6 +291,179 @@ def stats():
         tg_h=by_chan["tg"][0], site_h=by_chan["site"][0], max_h=by_chan["max"][0],
         rows_var="".join(rows_var) or "<tr><td colspan=5 class=z>нет данных</td></tr>",
         rows_code="".join(rows_code) or "<tr><td colspan=9 class=z>нет данных</td></tr>")
+    return Response(html, mimetype="text/html; charset=utf-8")
+
+
+_AF_RE = re.compile(r"afisha-v(\d+)")
+PAID_STATES = ("paid", "ticket_issued", "checked_in")   # canonical "оплачено" (см. desk.py)
+
+
+def _scan_variant_channel(row):
+    v = row["variant"] or None
+    ch = row["channel"] or None
+    if not v or not ch:
+        pv, pch = _parse(row["code"])
+        v = v or pv
+        ch = ch or pch
+    return v, ch
+
+
+def _attribute(slack_days=14):
+    """Map each registration -> (variant, channel, how).
+
+    Priority: (1) utm_campaign=afisha-v{N} + utm_content (precise, site QR);
+    (2) IP bridge — registration's consent IP matches a human QR scan IP, scan
+    no later than registration + slack. Else unattributed. QR can't change, so
+    these are the only signals available end-to-end."""
+    c = reg._conn()
+    try:
+        regs = c.execute(
+            "SELECT id, status, created_at, utm_campaign, utm_content, "
+            "amount_paid, price_eur FROM registrations").fetchall()
+        cons = c.execute(
+            "SELECT registration_id rid, ip FROM consent_log WHERE ip IS NOT NULL AND ip!=''").fetchall()
+        scans = c.execute(
+            "SELECT code, variant, channel, ip, ts FROM qr_scans "
+            "WHERE device!='bot' AND ip IS NOT NULL AND ip!=''").fetchall()
+    finally:
+        c.close()
+    ip2reg = {}
+    for r in cons:
+        ip2reg.setdefault(r["rid"], set()).add(r["ip"])
+    # index scans by ip for the bridge
+    by_ip = {}
+    for s in scans:
+        by_ip.setdefault(s["ip"], []).append(s)
+
+    out = {}
+    for r in regs:
+        v = ch = how = None
+        m = _AF_RE.search(r["utm_campaign"] or "")
+        if m:
+            v = m.group(1)
+            uc = (r["utm_content"] or "").lower()
+            ch = uc if uc in ("site", "tg", "max") else None
+            how = "utm"
+        else:
+            ips = ip2reg.get(r["id"], ())
+            best = None
+            for ip in ips:
+                for s in by_ip.get(ip, ()):
+                    if s["ts"] <= r["created_at"]:        # scan before/at registration
+                        if best is None or s["ts"] > best["ts"]:
+                            best = s
+            if best is not None:
+                v, ch = _scan_variant_channel(best)
+                how = "ip"
+        out[r["id"]] = {
+            "variant": v, "channel": ch, "how": how, "status": r["status"],
+            "paid": r["status"] in PAID_STATES,
+            "amount_paid": r["amount_paid"] or 0,
+            "price_eur": r["price_eur"] or 0,
+        }
+    return out
+
+
+@bp.route("/api/qr/funnel", methods=["GET"])
+def funnel():
+    if not _auth_ok():
+        return Response("unauthorized — add ?token=INTERNAL_TOKEN", status=401,
+                        mimetype="text/plain; charset=utf-8")
+    codes, span = _collect()                 # scans (human) per code
+    attr = _attribute()
+
+    # scans per variant
+    scans_v = {}
+    for x in codes:
+        v = x["variant"] or "?"
+        scans_v[v] = scans_v.get(v, 0) + x["hits"]
+
+    # funnel per variant from attributed registrations
+    blank = lambda: {"leads": 0, "reg": 0, "paid": 0, "rev": 0, "plan": 0}
+    fv = {}
+    direct = blank()                         # unattributed registrations
+    for a in attr.values():
+        bucket = fv.setdefault(a["variant"], blank()) if a["variant"] else direct
+        bucket["leads"] += 1
+        if a["status"] != "lead":
+            bucket["reg"] += 1
+        if a["paid"]:
+            bucket["paid"] += 1
+            bucket["rev"] += a["amount_paid"]
+        bucket["plan"] += a["price_eur"]
+
+    variants = sorted(set(list(scans_v) + list(fv)) - {"?"}, key=lambda k: int(k) if k.isdigit() else 99)
+    tot = {"scans": 0, "leads": 0, "reg": 0, "paid": 0, "rev": 0, "plan": 0}
+
+    def pct(a, b):
+        return ("%.1f%%" % (100.0 * a / b)) if b else "—"
+
+    rows = []
+    for v in variants:
+        s = scans_v.get(v, 0)
+        f = fv.get(v, blank())
+        tot["scans"] += s
+        for k in ("leads", "reg", "paid", "rev", "plan"):
+            tot[k] += f[k]
+        rows.append(
+            "<tr><td class=name>%s <span class=u>p%s</span></td>"
+            "<td>%d</td><td>%d</td><td>%d</td><td class=tot>%d</td>"
+            "<td>%s</td><td>%s</td><td>%d €<span class=u> / план %d</span></td></tr>"
+            % (VARIANTS.get(v, "вариант " + v), v, s, f["leads"], f["reg"], f["paid"],
+               pct(f["leads"], s), pct(f["paid"], f["leads"]), f["rev"], f["plan"]))
+
+    if request.args.get("format") == "json":
+        return jsonify({"totals": tot, "by_variant": fv, "scans": scans_v,
+                        "unattributed": direct})
+
+    tok = request.args.get("token") or request.args.get("key") or ""
+    html = """<!doctype html><html lang=ru><meta charset=utf-8>
+<meta name=viewport content="width=device-width,initial-scale=1">
+<title>Сквозная аналитика · Казань-Токио 2026</title>
+<style>
+ body{{font:15px/1.5 -apple-system,Segoe UI,Roboto,sans-serif;background:#0d1320;color:#e7ecf3;margin:0;padding:24px}}
+ h1{{font-size:20px;margin:0 0 2px}} .sub{{color:#8a96a8;font-size:13px;margin-bottom:20px}}
+ .cards{{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:22px}}
+ .card{{background:#161f31;border:1px solid #24304a;border-radius:12px;padding:14px 18px;min-width:120px}}
+ .card .n{{font-size:26px;font-weight:700}} .card .k{{color:#8a96a8;font-size:12px}}
+ .arw{{color:#46506a;align-self:center;font-size:20px}}
+ table{{border-collapse:collapse;width:100%;background:#121a29;border-radius:10px;overflow:hidden;margin-bottom:16px}}
+ th,td{{padding:9px 12px;text-align:left;border-bottom:1px solid #1e2840}}
+ th{{background:#1a2336;color:#aab6c8;font-weight:600;font-size:13px}}
+ td.tot,td.name{{font-weight:600}} .u{{color:#7f8ba0;font-weight:400;font-size:12px}}
+ a{{color:#5aa2ff}} .note{{color:#8a96a8;font-size:12px;margin-top:6px}}
+</style>
+<h1>Сквозная аналитика — путь до оплаты</h1>
+<div class=sub>QR-скан → лид → регистрация → оплата · <a href="/api/qr/stats?token={tok}">← QR-переходы</a> ·
+ <a href="?token={tok}&format=json">JSON</a></div>
+<div class=cards>
+ <div class=card><div class=n>{scans}</div><div class=k>сканов (люди)</div></div>
+ <div class=arw>→</div>
+ <div class=card><div class=n>{leads}</div><div class=k>лидов</div></div>
+ <div class=arw>→</div>
+ <div class=card><div class=n>{reg}</div><div class=k>регистраций</div></div>
+ <div class=arw>→</div>
+ <div class=card><div class=n>{paid}</div><div class=k>оплат</div></div>
+ <div class=arw>→</div>
+ <div class=card><div class=n>{rev} €</div><div class=k>выручка (факт)</div></div>
+</div>
+<table>
+ <tr><th>Флаер</th><th>Сканы</th><th>Лиды</th><th>Рег.</th><th>Оплаты</th>
+     <th>скан→лид</th><th>лид→оплата</th><th>Выручка</th></tr>
+ {rows}
+ <tr><td class=name>Без атрибуции <span class=u>(прямые/органика)</span></td>
+     <td>·</td><td>{d_leads}</td><td>{d_reg}</td><td>{d_paid}</td><td>·</td><td>{d_conv}</td>
+     <td>{d_rev} €<span class=u> / план {d_plan}</span></td></tr>
+</table>
+<div class=note>Атрибуция: точная по utm (site-QR несёт <code>afisha-vN</code>), для Telegram/MAX — мост по IP
+ (совпадение IP скана и согласия на лендинге). Лиды от ботов/без IP попадают в «без атрибуции».
+ «План» — сумма выбранных тарифов (<code>price_eur</code>); «факт» — подтверждённые оплаты.</div>
+</html>""".format(
+        tok=tok, scans=tot["scans"], leads=tot["leads"], reg=tot["reg"], paid=tot["paid"],
+        rev=tot["rev"],
+        rows="".join(rows) or "<tr><td colspan=8 class=u>нет данных</td></tr>",
+        d_leads=direct["leads"], d_reg=direct["reg"], d_paid=direct["paid"],
+        d_conv=pct(direct["paid"], direct["leads"]), d_rev=direct["rev"], d_plan=direct["plan"])
     return Response(html, mimetype="text/html; charset=utf-8")
 
 
