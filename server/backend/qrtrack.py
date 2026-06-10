@@ -20,7 +20,7 @@ bp = Blueprint("qrtrack", __name__)
 # Poster variant -> human label (marketing report).
 VARIANTS = {
     "1": "Лопухова Н.Б.",
-    "2": "Сойхер М.Я.",
+    "2": "Сойхер М.Г.",
     "3": "Столбовая И.В.",
     "4": "Погодин Д.Б.",
     "5": "Сато С.",
