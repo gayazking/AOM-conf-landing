@@ -25,6 +25,9 @@ VARIANTS = {
     "4": "Погодин Д.Б.",
     "5": "Сато С.",
     "6": "Наш канал",
+    "7": "Фазлиев А.",
+    "8": "Рязяпов М.",
+    "9": "Халиуллина Г.Р.",
 }
 # code suffix -> channel key/label. 'b' (bot) and legacy 't' both = Telegram.
 CHAN_LABEL = {"tg": "Telegram", "site": "Сайт", "max": "MAX"}
@@ -69,7 +72,7 @@ def init():
 
 
 def seed():
-    """Create 6 variants x 3 channels = 18 codes. Idempotent.
+    """Create 9 variants x 3 channels = 27 codes. Idempotent.
 
     Telegram suffix is 'b' (the live codes on the QR/flyers); legacy 't' rows,
     if present, are left untouched and still resolve to Telegram in reports.
@@ -77,7 +80,7 @@ def seed():
     init()
     c = reg._conn()
     try:
-        for v in range(1, 7):
+        for v in range(1, 10):
             site_dest = (SITE + "?utm_source=poster&utm_medium=qr&utm_campaign=afisha-v%d&utm_content=site" % v)
             rows = [
                 ("p%db" % v, str(v), "tg", TG, "Telegram-канал @sadaosato"),
