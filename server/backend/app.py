@@ -476,6 +476,25 @@ def push_to_amo(cfg, lead):
     contact id, persist a {tg_id, contact_id, lead_id} row to lead_map.jsonl so
     /amojo/outbound can link the chat to the deal without a phone query.
     """
+    # (A) anti-duplicate: if this phone already has an ACTIVE lead, reuse it
+    # instead of creating a second deal. Attach a note so the new touch's detail
+    # is preserved; later forward('registered') updates fields on the same lead.
+    try:
+        import amo_sync
+        existing = amo_sync.find_lead_by_phone(lead.get("phone")) if lead.get("phone") else None
+    except Exception as exc:
+        logger.error("amo dedup lookup failed (will create): %s", exc)
+        existing = None
+    if existing:
+        try:
+            amo_request(cfg, "POST", "/api/v4/leads/%d/notes" % int(existing),
+                        [{"note_type": "common",
+                          "params": {"text": "Повторное касание (антидубль):\n" + build_note_text(lead)}}])
+        except Exception as exc:
+            logger.error("amo reuse-note failed for lead %s: %s", existing, exc)
+        logger.info("amo dedup: reused existing lead id=%s (no new deal)", existing)
+        return existing
+
     body = build_complex_lead(cfg, lead)
     resp = amo_request(cfg, "POST", "/api/v4/leads/complex", body)
     if resp.status_code not in (200, 201):

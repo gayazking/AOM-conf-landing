@@ -272,6 +272,37 @@ def create_task(lead_id, text, task_type=1, due_in_sec=1800):
         return False
 
 
+def process_merge_conflicts(limit=100):
+    """(B) For each unhandled amo_dup in merge_log, create ONE manager task to
+    merge the two amoCRM cards (same human, already merged in our DB). Idempotent
+    — sets handled=1 so a card is never re-flagged. Returns count of tasks made."""
+    c = reg._conn()
+    try:
+        rows = c.execute(
+            "SELECT id, amo_lead_a, amo_lead_b FROM merge_log "
+            "WHERE reason='amo_dup' AND handled=0 ORDER BY id LIMIT ?", (limit,)).fetchall()
+    finally:
+        c.close()
+    done = 0
+    for r in rows:
+        a, b = r["amo_lead_a"], r["amo_lead_b"]
+        ok = True
+        if a and b and int(a) != int(b):
+            txt = ("Дубль в amoCRM: один человек — две сделки #%s и #%s "
+                   "(объединены в нашей БД). Слейте карточки: перенесите примечания/"
+                   "задачи в #%s и закройте лишнюю." % (a, b, a))
+            ok = create_task(int(a or b), txt, 1, 3600)
+        if ok:
+            cc = reg._conn()
+            try:
+                cc.execute("UPDATE merge_log SET handled=1 WHERE id=?", (r["id"],))
+                cc.commit()
+            finally:
+                cc.close()
+            done += 1
+    return done
+
+
 def find_lead_by_phone(phone):
     """Return an active (not WIN/LOST) lead id for this phone, or None."""
     if not phone:
