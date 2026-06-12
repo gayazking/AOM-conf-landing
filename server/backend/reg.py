@@ -39,7 +39,6 @@ CREATE UNIQUE INDEX IF NOT EXISTS ix_reg_phone ON registrations(phone_e164) WHER
 CREATE INDEX IF NOT EXISTS ix_reg_email ON registrations(email_lc);
 CREATE INDEX IF NOT EXISTS ix_reg_status ON registrations(status);
 CREATE INDEX IF NOT EXISTS ix_reg_tg ON registrations(telegram_user_id);
-CREATE INDEX IF NOT EXISTS ix_reg_merged ON registrations(merged_into);
 
 CREATE TABLE IF NOT EXISTS merge_log(
   id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT NOT NULL,
@@ -94,7 +93,7 @@ def init():
     cols = {r[1] for r in c.execute("PRAGMA table_info(registrations)")}
     if "merged_into" not in cols:
         c.execute("ALTER TABLE registrations ADD COLUMN merged_into TEXT")
-        c.execute("CREATE INDEX IF NOT EXISTS ix_reg_merged ON registrations(merged_into)")
+    c.execute("CREATE INDEX IF NOT EXISTS ix_reg_merged ON registrations(merged_into)")
     c.commit()
     c.close()
 
