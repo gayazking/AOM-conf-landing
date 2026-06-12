@@ -319,7 +319,7 @@ def _attribute(slack_days=14):
     try:
         regs = c.execute(
             "SELECT id, status, created_at, utm_campaign, utm_content, "
-            "amount_paid, price_eur FROM registrations").fetchall()
+            "amount_paid, price_eur FROM registrations WHERE merged_into IS NULL").fetchall()
         cons = c.execute(
             "SELECT registration_id rid, ip FROM consent_log WHERE ip IS NOT NULL AND ip!=''").fetchall()
         scans = c.execute(
