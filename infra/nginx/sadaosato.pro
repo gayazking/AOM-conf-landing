@@ -16,6 +16,7 @@ server {
     location = /privacy { try_files /privacy.html =404; }
     location = /pretix { return 301 https://tickets.sadaosato.pro/control/; }
     location ^~ /pretix/ { return 301 https://tickets.sadaosato.pro/control/; }
+    location = /hotels { try_files /hotels.html =404; }
     include /opt/sato/nginx-api.snippet;
     index index.html;
 
