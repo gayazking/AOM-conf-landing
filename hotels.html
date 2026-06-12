@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Где остановиться в Казани · Казань — Токио 2026</title>
-<meta name="description" content="Гостиницы Казани рядом с площадкой саммита «Казань — Токио 2026» (Гранд Отель «Ривьера»). 16 отелей всех классов: фото, звёзды, цены, карта, бронирование.">
+<meta name="description" content="Гостиницы Казани рядом с площадкой саммита «Казань — Токио 2026» (Гранд Отель «Ривьера»). 16 отелей всех классов: фото, звёзды, цены, расстояние до площадки, Яндекс-карта, бронирование.">
 <!-- Yandex.Metrika counter -->
 <script type="text/javascript">
 window.__ymId = 109717932;
@@ -12,39 +12,33 @@ window.__ymId = 109717932;
 ym(109717932,'init',{ssr:true,webvisor:true,clickmap:true,accurateTrackBounce:true,trackLinks:true});
 </script>
 <noscript><div><img src="https://mc.yandex.ru/watch/109717932" style="position:absolute;left:-9999px;" alt="" /></div></noscript>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
-  :root{--bg:#0f1115;--bg2:#151821;--card:#181b24;--line:#262b36;--gold:#c9a572;--gold2:#e3c794;--txt:#e9ebf0;--muted:#9aa3b2}
+  :root{--bg:#0f1115;--bg2:#151821;--card:#181b24;--line:#262b36;--gold:#c9a572;--gold2:#e3c794;--txt:#e9ebf0;--muted:#9aa3b2;--green:#1f9d55}
   *{margin:0;padding:0;box-sizing:border-box}
   body{background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;line-height:1.5;-webkit-font-smoothing:antialiased}
   a{color:inherit;text-decoration:none}
   .wrap{max-width:1180px;margin:0 auto;padding:0 18px}
   .serif{font-family:Georgia,"Times New Roman",serif}
-  /* hero */
   header.hero{padding:38px 0 22px;border-bottom:1px solid var(--line);background:radial-gradient(1200px 320px at 50% -120px,rgba(201,165,114,.16),transparent)}
   .back{display:inline-flex;align-items:center;gap:7px;color:var(--muted);font-size:14px;margin-bottom:18px}
   .back:hover{color:var(--gold)}
   .kicker{color:var(--gold);letter-spacing:.22em;text-transform:uppercase;font-size:12px;font-weight:600}
   h1{font-size:clamp(28px,5vw,46px);font-weight:700;margin:10px 0 8px;line-height:1.12}
-  .lead{color:var(--muted);max-width:760px;font-size:16px}
-  /* venue banner */
+  .lead{color:var(--muted);max-width:780px;font-size:16px}
   .venue{margin:22px 0 6px;display:flex;gap:16px;align-items:center;background:linear-gradient(100deg,rgba(201,165,114,.14),rgba(201,165,114,.04));border:1px solid var(--gold);border-radius:16px;padding:16px 18px;flex-wrap:wrap}
-  .venue .vico{font-size:30px}
-  .venue b{color:var(--gold2)}
+  .venue .vico{font-size:30px}.venue b{color:var(--gold2)}
   .venue .vbtns{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
-  /* filters */
   .filters{display:flex;gap:8px;flex-wrap:wrap;margin:26px 0 14px}
   .chip{border:1px solid var(--line);background:var(--bg2);color:var(--muted);padding:8px 14px;border-radius:30px;font-size:14px;cursor:pointer;transition:.15s}
   .chip:hover{border-color:var(--gold)}
   .chip.on{background:var(--gold);color:#10131a;border-color:var(--gold);font-weight:700}
-  /* map */
-  #map{height:420px;border-radius:16px;border:1px solid var(--line);margin:8px 0 6px;z-index:1}
+  .mapwrap{border-radius:16px;border:1px solid var(--line);overflow:hidden;margin:8px 0 6px}
+  .mapwrap iframe{display:block;width:100%;height:430px;border:0;filter:grayscale(.1) contrast(1.02)}
   .maphint{color:var(--muted);font-size:13px;margin-bottom:26px}
-  /* grid */
-  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:18px;padding-bottom:30px}
+  .maphint b{color:var(--gold2)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:18px;padding-bottom:30px}
   .hcard{background:var(--card);border:1px solid var(--line);border-radius:16px;overflow:hidden;display:flex;flex-direction:column;transition:.18s}
   .hcard:hover{border-color:var(--gold);transform:translateY(-3px)}
-  .hcard.isvenue{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold) inset}
   .ph{position:relative;aspect-ratio:16/10;background:#0c0e13 center/cover no-repeat;overflow:hidden}
   .ph img{width:100%;height:100%;object-fit:cover;display:block;transition:.4s}
   .hcard:hover .ph img{transform:scale(1.05)}
@@ -52,23 +46,22 @@ ym(109717932,'init',{ssr:true,webvisor:true,clickmap:true,accurateTrackBounce:tr
   .near{position:absolute;top:10px;right:10px;background:rgba(31,157,85,.92);color:#fff;font-size:11px;font-weight:700;padding:4px 9px;border-radius:20px}
   .price{position:absolute;bottom:10px;right:10px;background:rgba(15,17,21,.86);color:#fff;font-size:13px;font-weight:700;padding:5px 11px;border-radius:10px}
   .price small{color:var(--muted);font-weight:400}
-  .body{padding:14px 15px 15px;display:flex;flex-direction:column;gap:7px;flex:1}
+  .body{padding:14px 15px 15px;display:flex;flex-direction:column;gap:8px;flex:1}
+  .toprow{display:flex;justify-content:space-between;align-items:center;gap:8px}
   .stars{color:var(--gold);letter-spacing:2px;font-size:15px;line-height:1}
-  .hname{font-size:18px;font-weight:700}
-  .meta{color:var(--muted);font-size:13.5px}
-  .tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:2px}
-  .tag{font-size:12px;color:var(--muted);background:#11141b;border:1px solid var(--line);border-radius:8px;padding:3px 8px}
-  .note{font-size:13.5px;color:#c3c9d4}
+  .dist{color:var(--green);font-size:12.5px;font-weight:700;white-space:nowrap}
+  .hname{font-size:18px;font-weight:700;line-height:1.2}
+  .meta{color:var(--muted);font-size:13px}
+  .note{font-size:13.5px;color:#cdd2dc}
+  .tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:1px}
+  .tag{font-size:11.5px;color:#aeb6c4;background:#11141b;border:1px solid var(--line);border-radius:7px;padding:3px 8px}
   .btns{display:flex;gap:8px;margin-top:auto;padding-top:6px}
   .btn{flex:1;text-align:center;padding:9px;border-radius:10px;font-size:13.5px;font-weight:700;transition:.15s}
-  .btn.gold{background:var(--gold);color:#10131a}
-  .btn.gold:hover{background:var(--gold2)}
-  .btn.ghost{border:1px solid var(--line);color:var(--txt)}
-  .btn.ghost:hover{border-color:var(--gold);color:var(--gold)}
+  .btn.gold{background:var(--gold);color:#10131a}.btn.gold:hover{background:var(--gold2)}
+  .btn.ghost{border:1px solid var(--line);color:var(--txt)}.btn.ghost:hover{border-color:var(--gold);color:var(--gold)}
   footer{border-top:1px solid var(--line);padding:24px 0 50px;color:var(--muted);font-size:13px}
   footer a{color:var(--gold)}
   .disc{background:var(--bg2);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin:10px 0 18px;color:var(--muted);font-size:13px}
-  .leaflet-popup-content{font-size:13px}
 </style>
 </head>
 <body>
@@ -76,24 +69,22 @@ ym(109717932,'init',{ssr:true,webvisor:true,clickmap:true,accurateTrackBounce:tr
   <a class="back" href="https://sadaosato.pro/">← На главную саммита</a>
   <div class="kicker">Казань — Токио 2026 · проживание</div>
   <h1 class="serif">Где остановиться в Казани</h1>
-  <p class="lead">16 гостиниц всех классов — от премиум-отелей у Кремля до уютных вариантов рядом с площадкой саммита. Реальные фото, звёзды, ориентир по цене, карта и бронирование. Площадка — <b style="color:var(--gold2)">Гранд Отель «Ривьера»</b>.</p>
-
+  <p class="lead">16 проверенных гостиниц всех классов — от премиум-отелей у Кремля до удобных вариантов в районе площадки. Реальные фото, звёзды, ориентир по цене, удобства, расстояние до площадки, карта и бронирование. Площадка саммита — <b style="color:var(--gold2)">Гранд Отель «Ривьера»</b>.</p>
   <div class="venue">
     <div class="vico">🏟</div>
     <div>
       <div style="font-size:12px;color:var(--gold);letter-spacing:.15em;text-transform:uppercase;font-weight:600">Точка проведения</div>
       <div style="font-size:17px;margin-top:2px"><b>Гранд Отель «Ривьера» 4★</b> — пр. Фатыха&nbsp;Амирхана, 1а, Ново-Савиновский р-н</div>
-      <div class="meta" style="margin-top:3px">Саммит и проживание в одном месте. Аквапарк, пляж, бассейн, завтрак. Удобно — никуда не ехать на лекции.</div>
+      <div class="meta" style="margin-top:3px">Саммит и проживание в одном месте: лекции внизу, номер наверху. Аквапарк, крытый бассейн, пляж на Казанке, завтрак «шведский стол», большая парковка. Самый удобный вариант — никуда не ехать.</div>
     </div>
     <div class="vbtns">
       <a class="btn gold" style="padding:9px 16px" target="_blank" rel="noopener" href="https://kazanriviera.ru/hotel/">Сайт отеля</a>
-      <a class="btn ghost" style="padding:9px 16px" target="_blank" rel="noopener" href="https://yandex.ru/maps/?mode=search&text=Гранд%20Отель%20Ривьера%20Казань%20Фатыха%20Амирхана%201а">На карте</a>
+      <a class="btn ghost" style="padding:9px 16px" target="_blank" rel="noopener" href="https://yandex.ru/maps/?mode=search&text=Гранд%20Отель%20Ривьера%20Казань%20Фатыха%20Амирхана%201а">На Яндекс.Картах</a>
     </div>
   </div>
-
   <div class="filters" id="filters">
     <button class="chip on" data-f="all">Все (16)</button>
-    <button class="chip" data-f="near">⭐ Рядом с площадкой</button>
+    <button class="chip" data-f="near">⭐ Ближе к площадке</button>
     <button class="chip" data-f="5">5 звёзд · премиум</button>
     <button class="chip" data-f="4">4 звезды · бизнес</button>
     <button class="chip" data-f="3">3 звезды · эконом</button>
@@ -101,56 +92,93 @@ ym(109717932,'init',{ssr:true,webvisor:true,clickmap:true,accurateTrackBounce:tr
 </div></header>
 
 <main class="wrap">
-  <div id="map"></div>
-  <div class="maphint">📍 Золотой маркер — площадка (Ривьера). Цветные — отели (зелёные ближе к площадке). Пины ориентировочные; точный адрес и бронь — по кнопкам в карточке.</div>
+  <div class="mapwrap"><iframe loading="lazy" id="ymap" allowfullscreen></iframe></div>
+  <div class="maphint">📍 <b>Красный</b> маркер — площадка «Ривьера». Синие — отели. Расстояние до площадки указано в каждой карточке. Точный адрес и бронь — по кнопкам в карточке.</div>
   <div class="grid" id="grid"></div>
 </main>
 
 <footer><div class="wrap">
-  <div class="disc">⚠️ Цены — ориентир «от» за ночь (стандартный номер) и сильно зависят от дат и спроса; <b>точную стоимость и наличие проверяйте при бронировании</b>. Фото и карточки — из открытых сервисов бронирования. Это справочная подборка, не реклама конкретных отелей.</div>
-  Саммит «Казань — Токио 2026» · <a href="https://sadaosato.pro/">sadaosato.pro</a> · Вопросы по проживанию и скидкам — у менеджера: +7&nbsp;986&nbsp;848-78-25
+  <div class="disc">⚠️ Цены — ориентир «от» за стандартный номер за ночь, сильно зависят от дат и спроса; <b>точную стоимость, удобства и наличие проверяйте при бронировании</b>. Фото и данные — из открытых сервисов бронирования. Подборка справочная, не реклама конкретных отелей.</div>
+  Саммит «Казань — Токио 2026» · <a href="https://sadaosato.pro/">sadaosato.pro</a> · Вопросы по проживанию и скидкам — менеджер: +7&nbsp;986&nbsp;848-78-25
 </div></footer>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-const VENUE={name:"Гранд Отель «Ривьера» (площадка)",lat:55.8206,lng:49.1232};
-// cls: 5/4/3 ; near:true = близко к площадке (Ново-Савиновский)
+const VENUE={lat:55.8198,lon:49.1242};
+// lat,lon — ориентировочные (для расстояния и общей карты); точное место — по ссылке в карточке
 const H=[
- {n:"Korston Royal Kazan",cls:5,addr:"ул. Николая Ершова, 1а",dist:"Вахитовский · парк Горького",price:"7 000",food:"Рестораны, бар, завтрак «шведский стол»",note:"Знаковый небоскрёб, панорама города, СПА и бассейн. ~10 мин до центра.",img:"/hotel-img/2.jpg",lat:55.7889,lng:49.1386,site:"https://korston.ru/kazan/hotel/"},
- {n:"Mirage Hotel",cls:5,addr:"ул. Московская, 5",dist:"Центр · у Кремля",price:"15 000",food:"Ресторан, завтрак, лобби-бар",note:"Стеклянный фасад отражает Кремль и Кул-Шариф. В двух шагах от главных достопримечательностей.",img:"/hotel-img/3.jpg"},
- {n:"Luciano Residence & Spa",cls:5,addr:"ул. Право-Булачная, 49",dist:"Центр · ул. Баумана рядом",price:"23 500",food:"Ресторан, завтрак, СПА-меню",note:"Бутик-отель премиум-класса с большим СПА и бассейном в самом центре.",img:"/hotel-img/4.jpg"},
- {n:"Tasigo Kazan Palace",cls:5,addr:"ул. Калинина, 3б",dist:"Кировский · ближе к Казанке",price:"22 500",food:"Ресторан высокой кухни, завтрак",note:"Дворцовый стиль, спокойный район, СПА. Премиум для тех, кто ценит тишину.",img:"/hotel-img/5.jpg"},
- {n:"DoubleTree by Hilton Kazan City Center",cls:4,addr:"ул. Чернышевского, 21",dist:"Центр · у Кремля",price:"13 000",food:"Ресторан, завтрак «шведский стол», бар",note:"Международный бренд Hilton в центре, фитнес и бассейн. Надёжный бизнес-вариант.",img:"/hotel-img/6.jpg"},
- {n:"Ramada by Wyndham Kazan City Centre",cls:4,addr:"ул. Чернышевского, 39",dist:"Центр",price:"12 000",food:"Ресторан, завтрак включён",note:"Сетевой Wyndham рядом с Кремлём и пешеходной ул. Баумана.",img:"/hotel-img/7.jpg"},
- {n:"Cosmos Kazan Hotel",cls:4,near:true,addr:"ул. Лесгафта, 7",dist:"Ново-Савиновский · у Казанки",price:"8 500",food:"Ресторан, завтрак «шведский стол»",note:"Современный сетевой отель Cosmos у набережной. Близко к площадке (Ривьера).",img:"/hotel-img/8.jpg"},
- {n:"Релита-Казань",cls:4,near:true,addr:"ул. Декабристов, 85г",dist:"Ново-Савиновский",price:"10 000",food:"Ресторан, завтрак, бассейн",note:"Большой бизнес-отель с бассейном и СПА в том же районе, что и площадка.",img:"/hotel-img/9.jpg"},
- {n:"People Stadium Hotel",cls:4,near:true,addr:"ул. Хусаина Ямашева, 115а",dist:"Ново-Савиновский · у Ак Барс Арены",price:"8 400",food:"Кафе, завтрак включён",note:"Рядом с Ак Барс Ареной и набережной Казанки — пешком/5 мин на авто до Ривьеры.",img:"/hotel-img/12.jpg"},
- {n:"Гранд Отель Казань",cls:4,addr:"ул. Петербургская, 1",dist:"Центр · ул. Петербургская",price:"5 500",food:"Ресторан, завтрак «шведский стол»",note:"Просторный отель на красивой пешеходной Петербургской, рядом центр.",img:"/hotel-img/10.jpg"},
- {n:"NEO Kazan Palace by Tasigo",cls:4,addr:"ул. Калинина, 3в",dist:"Кировский",price:"14 000",food:"Ресторан, завтрак",note:"Новый отель премиальной линейки Tasigo, спокойная локация, СПА.",img:"/hotel-img/11.jpg"},
- {n:"Гостиница Ногай",cls:4,addr:"ул. Профсоюзная, 16б",dist:"Центр · у Кремля",price:"9 000",food:"Ресторан, завтрак «шведский стол»",note:"В историческом центре, минута до ул. Баумана и Кремля.",img:"/hotel-img/13.jpg"},
- {n:"Гостиница Татарстан",cls:3,addr:"ул. Пушкина, 4",dist:"Центр · пл. Тукая",price:"5 500",food:"Кафе, завтрак",note:"Легендарная гостиница в самом центре, у площади Тукая и ул. Баумана.",img:"/hotel-img/14.jpg"},
- {n:"Регина на Петербургской",cls:3,addr:"ул. Петербургская, 11",dist:"Центр",price:"5 900",food:"Завтрак включён",note:"Аккуратный бюджетный вариант на пешеходной Петербургской.",img:"/hotel-img/15.jpg"},
- {n:"Особняк на Театральной",cls:3,addr:"ул. Театральная, 3",dist:"Центр · у театра Камала рядом",price:"7 400",food:"Завтрак, кафе",note:"Уютный мини-отель в тихом центре, рядом озеро Кабан и театр.",img:"/hotel-img/16.jpg"},
- {n:"Гостиница Дон Кихот",cls:3,addr:"ул. Бурхана Шахиди, 11/16",dist:"Центр · у ж/д вокзала",price:"6 200",food:"Завтрак",note:"Недорого, рядом ж/д вокзал и центр — удобно приезжающим поездом.",img:"/hotel-img/17.jpg"},
+ {n:"Korston Royal Kazan",cls:5,addr:"ул. Николая Ершова, 1а",dist:"Вахитовский · парк Горького",price:"7 000",
+  note:"Знаковый отель-небоскрёб с панорамными видами на город. Крытый бассейн, большой фитнес и СПА, рестораны и ночная жизнь под одной крышей, рядом парк Горького и ТРК. До центра ~10 минут на авто.",
+  tags:["Бассейн","СПА","Фитнес","Ресторан","Завтрак","Парковка"],lat:55.7889,lon:49.1378,site:"https://korston.ru/kazan/hotel/"},
+ {n:"Mirage Hotel",cls:5,addr:"ул. Московская, 5",dist:"Центр · у Кремля",price:"15 000",
+  note:"Бутик-отель с зеркальным фасадом, в котором отражаются Кремль и мечеть Кул-Шариф. Крытый бассейн и СПА, авторский ресторан. Пешком до всех главных достопримечательностей старого города.",
+  tags:["Бассейн","СПА","Ресторан","Завтрак","Парковка"],lat:55.7938,lon:49.1036},
+ {n:"Luciano Residence & Spa",cls:5,addr:"ул. Право-Булачная, 49",dist:"Центр · ул. Баумана рядом",price:"23 500",
+  note:"Камерный отель премиум-класса с одним из лучших СПА-центров города (хаммам, бассейн, спа-программы). Тихий двор в самом центре, в двух шагах от пешеходной ул. Баумана. Для тех, кто хочет отдых + лечение.",
+  tags:["Большой СПА","Бассейн","Ресторан","Завтрак","Парковка"],lat:55.7905,lon:49.1090},
+ {n:"Kazan Palace by Tasigo",cls:5,addr:"ул. Калинина, 3Б",dist:"исторический центр",price:"22 500",
+  note:"Дворцовый отель в отреставрированном здании 1910 года, член The Leading Hotels of the World. Изысканные интерьеры, ресторан высокой кухни, СПА. Премиум для ценителей истории и уровня сервиса.",
+  tags:["СПА","Ресторан","Завтрак","Парковка","Luxury"],lat:55.7827,lon:49.1376},
+ {n:"DoubleTree by Hilton Kazan City Center",cls:4,addr:"ул. Чернышевского, 21",dist:"Центр · у Кремля",price:"13 000",
+  note:"Международный бренд Hilton в центре: предсказуемый высокий сервис, фирменное тёплое печенье на ресепшене, бассейн и фитнес, ресторан и бар. Надёжный бизнес-выбор в шаге от Кремля.",
+  tags:["Бассейн","Фитнес","Ресторан","Завтрак","Парковка"],lat:55.7918,lon:49.1096},
+ {n:"Ramada by Wyndham Kazan City Centre",cls:4,addr:"ул. Чернышевского, 39",dist:"Центр",price:"12 000",
+  note:"Сетевой отель Wyndham рядом с Кремлём и пешеходной ул. Баумана. Просторные номера, ресторан и фитнес, завтрак «шведский стол». Удобно для деловых поездок и осмотра центра пешком.",
+  tags:["Фитнес","Ресторан","Завтрак","Парковка"],lat:55.7888,lon:49.1047},
+ {n:"Cosmos Kazan Hotel (Radisson Individuals)",cls:4,addr:"ул. Лесгафта, 7",dist:"Вахитовский · у парка Горького",price:"8 500",
+  note:"Современный отель сети Cosmos под управлением Radisson: свежий дизайн, ресторан и бар, фитнес. Рядом парк Горького и КГМУ, до центра и Кремля недалеко. Хорошее соотношение цена/качество.",
+  tags:["Ресторан","Фитнес","Завтрак","Парковка","Wi-Fi"],lat:55.7872,lon:49.1425},
+ {n:"Релита-Казань",cls:4,addr:"ул. Декабристов, 85г",dist:"Ново-Савиновский (район площадки)",price:"10 000",
+  note:"Крупный бизнес-отель в том же районе, что и площадка. Крытый бассейн, СПА и сауны, ресторан, большие конференц-залы. Удобно добираться до Ривьеры, спокойная жилая локация.",
+  tags:["Бассейн","СПА","Ресторан","Завтрак","Парковка"],lat:55.8185,lon:49.0904},
+ {n:"People Stadium Hotel",cls:4,addr:"ул. Хусаина Ямашева, 115а",dist:"Ново-Савиновский · у Ак Барс Арены",price:"8 400",
+  note:"Отель у стадиона «Ак Барс Арена» и набережной Казанки — ближе всех к площадке. Современные номера, кафе, парковка. Хороший выбор, если важно быть рядом с Ривьерой и не платить премиум.",
+  tags:["Кафе","Завтрак","Парковка","Wi-Fi"],lat:55.8230,lon:49.1080},
+ {n:"Гранд Отель Казань",cls:4,addr:"ул. Петербургская, 1",dist:"Центр · ул. Петербургская",price:"5 500",
+  note:"Просторный отель на красивой пешеходной Петербургской улице. Ресторан, завтрак «шведский стол», конференц-залы. Близко центр, пл. Тукая и ул. Баумана. Выгодный вариант 4★ в центре.",
+  tags:["Ресторан","Завтрак","Парковка","Конференц-залы"],lat:55.7866,lon:49.1241},
+ {n:"NEO Kazan Palace by Tasigo",cls:4,addr:"ул. Калинина, 3в",dist:"исторический центр",price:"14 000",
+  note:"Новый отель премиальной линейки Tasigo рядом с Kazan Palace: современные номера, ресторан, СПА-зона. Сочетание исторического окружения и свежего сервиса.",
+  tags:["СПА","Ресторан","Завтрак","Парковка"],lat:55.7834,lon:49.1387},
+ {n:"Гостиница Ногай",cls:4,addr:"ул. Профсоюзная, 16б",dist:"Центр · у Кремля",price:"9 000",
+  note:"Большой отель в самом сердце старого города: минута до пешеходной ул. Баумана и Кремля. Ресторан, завтрак «шведский стол», просторные номера. Идеален для туристического осмотра пешком.",
+  tags:["Ресторан","Завтрак","Парковка","Wi-Fi"],lat:55.7921,lon:49.1139},
+ {n:"Гостиница Татарстан",cls:3,addr:"ул. Пушкина, 4",dist:"Центр · пл. Тукая",price:"5 500",
+  note:"Легендарная высотная гостиница прямо на площади Тукая, у начала ул. Баумана. После реновации — аккуратные номера, кафе, отличные виды на центр. Максимально центральное расположение за разумные деньги.",
+  tags:["Кафе","Завтрак","Парковка","Виды на центр"],lat:55.7865,lon:49.1224},
+ {n:"Регина на Петербургской",cls:3,addr:"ул. Петербургская, 11",dist:"Центр",price:"5 900",
+  note:"Аккуратный бюджетный отель сети «Регина» на пешеходной Петербургской улице. Чисто, завтрак включён, спокойно, рядом центр. Хороший эконом-вариант без переплат.",
+  tags:["Завтрак","Wi-Fi","Парковка рядом"],lat:55.7857,lon:49.1258},
+ {n:"Особняк на Театральной",cls:3,addr:"ул. Театральная, 3",dist:"Центр · у театра Камала",price:"7 400",
+  note:"Уютный мини-отель в тихом историческом центре, рядом озеро Нижний Кабан, театр Камала и ул. Баумана. Камерная атмосфера, индивидуальный сервис, завтрак. Для тех, кто не любит большие отели.",
+  tags:["Завтрак","Кафе","Wi-Fi","Тихий центр"],lat:55.7954,lon:49.1236},
+ {n:"Гостиница Дон Кихот",cls:3,addr:"ул. Бурхана Шахиди, 11/16",dist:"Центр · у ж/д вокзала",price:"6 200",
+  note:"Недорогой отель рядом с железнодорожным вокзалом и центром — удобно тем, кто приезжает поездом. Чистые номера, завтрак, парковка. Бюджетно и практично.",
+  tags:["Завтрак","Парковка","Wi-Fi","У вокзала"],lat:55.7874,lon:49.1050},
 ];
+const NEAR_KM=3;
+function km(a){const R=6371,dl=(a.lat-VENUE.lat)*Math.PI/180,dn=(a.lon-VENUE.lon)*Math.PI/180,
+  x=Math.sin(dl/2)**2+Math.cos(VENUE.lat*Math.PI/180)*Math.cos(a.lat*Math.PI/180)*Math.sin(dn/2)**2;
+  return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));}
+H.forEach(h=>h.km=km(h));
 const stars=n=>"★".repeat(n)+"<span style='color:#3a3f4b'>"+"★".repeat(5-n)+"</span>";
 const ymaps=h=>"https://yandex.ru/maps/?mode=search&text="+encodeURIComponent(h.n+", "+h.addr+", Казань");
 const grid=document.getElementById('grid');
 function render(f){
   grid.innerHTML="";
-  H.filter(h=> f==='all'?true : f==='near'?h.near : h.cls==+f).forEach(h=>{
-    const el=document.createElement('div');
-    el.className="hcard";
-    el.innerHTML=`<div class="ph"><img loading="lazy" src="${h.img}" alt="${h.n}" onerror="this.style.opacity=0">
+  H.filter(h=> f==='all'?true : f==='near'?h.km<=NEAR_KM : h.cls==+f)
+   .sort((a,b)=> f==='near'? a.km-b.km : 0)
+   .forEach(h=>{
+    const el=document.createElement('div');el.className="hcard";
+    el.innerHTML=`<div class="ph"><img loading="lazy" src="${h.img}" alt="${h.n}" onerror="this.parentNode.style.background='linear-gradient(135deg,#1a1d26,#23262f)'">
         <span class="badge">${h.cls}★ · ${h.cls===5?'премиум':h.cls===4?'бизнес':'эконом'}</span>
-        ${h.near?'<span class="near">рядом с площадкой</span>':''}
+        ${h.km<=NEAR_KM?'<span class="near">рядом с площадкой</span>':''}
         <span class="price">от ${h.price}&nbsp;₽ <small>/ ночь</small></span></div>
       <div class="body">
-        <div class="stars">${stars(h.cls)}</div>
+        <div class="toprow"><div class="stars">${stars(h.cls)}</div><div class="dist">📍 ~${h.km.toFixed(1)} км до площадки</div></div>
         <div class="hname">${h.n}</div>
-        <div class="meta">📍 ${h.addr} · ${h.dist}</div>
-        <div class="tags"><span class="tag">🍽 ${h.food}</span></div>
+        <div class="meta">${h.addr} · ${h.dist}</div>
         <div class="note">${h.note}</div>
+        <div class="tags">${h.tags.map(t=>`<span class="tag">${t}</span>`).join('')}</div>
         <div class="btns">
           <a class="btn gold" target="_blank" rel="noopener" href="${h.site||ymaps(h)}">Подробнее и бронь</a>
           <a class="btn ghost" target="_blank" rel="noopener" href="${ymaps(h)}">На карте</a>
@@ -159,27 +187,20 @@ function render(f){
     grid.appendChild(el);
   });
 }
+// images (explicit map: array order -> downloaded file number)
+const IMG=[2,3,4,5,6,7,8,9,12,10,11,13,14,15,16,17];
+H.forEach((h,i)=>h.img="/hotel-img/"+IMG[i]+".jpg");
 render('all');
 document.querySelectorAll('#filters .chip').forEach(c=>c.onclick=()=>{
   document.querySelectorAll('#filters .chip').forEach(x=>x.classList.remove('on'));
   c.classList.add('on'); render(c.dataset.f);
   if(window.ym) ym(109717932,'reachGoal','hotels_filter_'+c.dataset.f);
 });
-
-// map
-const map=L.map('map',{scrollWheelZoom:false}).setView([55.806,49.122],12);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);
-const gold=L.divIcon({className:'',html:'<div style="background:#c9a572;width:20px;height:20px;border-radius:50%;border:3px solid #10131a;box-shadow:0 0 0 2px #c9a572"></div>',iconSize:[20,20],iconAnchor:[10,10]});
-function dot(color){return L.divIcon({className:'',html:`<div style="background:${color};width:14px;height:14px;border-radius:50%;border:2px solid #10131a"></div>`,iconSize:[14,14],iconAnchor:[7,7]});}
-L.marker([VENUE.lat,VENUE.lng],{icon:gold,zIndexOffset:1000}).addTo(map).bindPopup("<b>🏟 "+VENUE.name+"</b><br>пр. Ф. Амирхана, 1а");
-const grp=[[VENUE.lat,VENUE.lng]];
-H.forEach(h=>{ if(!h.lat)return;
-  const col=h.near?'#1f9d55':h.cls===5?'#c9a572':h.cls===4?'#5b8def':'#9aa3b2';
-  L.marker([h.lat,h.lng],{icon:dot(col)}).addTo(map)
-   .bindPopup(`<b>${h.n}</b> ${h.cls}★<br>от ${h.price} ₽/ночь<br><a target="_blank" href="${ymaps(h)}">Открыть на Яндекс.Картах →</a>`);
-  grp.push([h.lat,h.lng]);
-});
-map.fitBounds(grp,{padding:[40,40]});
+// Yandex map-widget (no API key): venue + all hotels as placemarks
+const pts=[VENUE.lon+","+VENUE.lat+",pm2rdl"].concat(H.map(h=>h.lon+","+h.lat+",pm2blm")).join("~");
+const lons=[VENUE.lon].concat(H.map(h=>h.lon)), lats=[VENUE.lat].concat(H.map(h=>h.lat));
+const cl=(Math.min(...lons)+Math.max(...lons))/2, cla=(Math.min(...lats)+Math.max(...lats))/2;
+document.getElementById('ymap').src="https://yandex.ru/map-widget/v1/?ll="+cl.toFixed(4)+","+cla.toFixed(4)+"&z=12&pt="+encodeURIComponent(pts);
 </script>
 </body>
 </html>
