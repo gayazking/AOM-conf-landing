@@ -11,6 +11,7 @@ reverse WIN issues the ticket immediately, FORWARD aggressiveness = medium
 real money/manual), existing stage names kept.
 """
 import logging
+import re
 import time
 import urllib.parse
 from datetime import datetime, timezone
@@ -304,11 +305,16 @@ def process_merge_conflicts(limit=100):
 
 
 def find_lead_by_phone(phone):
-    """Return an active (not WIN/LOST) lead id for this phone, or None."""
+    """Return an active (not WIN/LOST) lead id for this phone, or None.
+
+    Searches amoCRM by the 10-digit national core so a contact stored as 8XXX…,
+    7XXX…, +7XXX… or with spaces all match the same person (one number)."""
     if not phone:
         return None
+    norm = reg.normalize_phone(phone) or phone
+    core = re.sub(r"\D", "", norm)[-10:]            # last 10 digits = subscriber
     try:
-        q = urllib.parse.quote(reg.normalize_phone(phone) or phone)
+        q = urllib.parse.quote(core or norm)
         r = _amo("GET", "/api/v4/contacts?query=%s&with=leads" % q)
         if r.status_code != 200:
             return None
@@ -366,12 +372,18 @@ def forward(reg_id, event):
 
         if event == "registered":
             target = ST_REG
-            fields["Статус оплаты"] = "Не оплачено"
+            # anti-regression: a repeat web/bot submit must NOT drag a lead that's
+            # already further down the funnel back to "Не оплачено" / re-spawn the
+            # "send SBP" task. Only set those when the deal is still at/below reg.
+            _cur = _get_lead(lead_id)
+            _cur_rank = _RANK.get((_cur or {}).get("status_id"), 0)
+            if _cur_rank <= _RANK[ST_REG]:
+                fields["Статус оплаты"] = "Не оплачено"
+                task = ("Выслать реквизиты СБП / связаться", 1, 1800)
             if pkg in _TARIFF_TAG:
                 tags.append(_TARIFF_TAG[pkg])
             if (row.get("source") or "") == "bot" or row.get("telegram_user_id"):
                 tags += ["Telegram-регистрация", "telegram-bot"]
-            task = ("Выслать реквизиты СБП / связаться", 1, 1800)
         elif event == "sbp_shown":
             target = ST_DECIDE
             fields["Статус оплаты"] = "Ссылка показана"

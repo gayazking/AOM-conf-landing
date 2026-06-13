@@ -99,13 +99,18 @@ def init():
 
 
 def normalize_phone(p):
+    """Canonical E.164. RU is unified regardless of how the prefix was typed —
+    +7…, 8…, 7…, bare 10 digits, with spaces/brackets/dashes — all collapse to
+    +7XXXXXXXXXX (one number). Foreign numbers keep their country code. Idempotent."""
     if not p:
         return ""
     d = re.sub(r"\D", "", str(p))
-    if len(d) == 11 and d[0] == "8":
-        d = "7" + d[1:]
-    if len(d) == 10:
-        d = "7" + d
+    if d.startswith("00"):          # 00 = international access prefix -> drop
+        d = d[2:]
+    if len(d) == 11 and d[0] in ("7", "8"):   # RU national: 7XXXXXXXXXX / 8XXXXXXXXXX
+        d = d[1:]
+    if len(d) == 10:                # bare RU subscriber number
+        return "+7" + d
     return ("+" + d) if d else ""
 
 
