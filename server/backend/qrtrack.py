@@ -10,7 +10,7 @@ import os
 import re
 from datetime import datetime, timezone
 
-from flask import Blueprint, request, redirect, Response, jsonify
+from flask import Blueprint, request, redirect, Response, jsonify, session
 
 import reg
 
@@ -150,7 +150,19 @@ def _auth_ok():
             expected = (app.load_env() or {}).get("INTERNAL_TOKEN") or ""
         except Exception:
             expected = ""
+    if session.get("dash") is True:
+        return True
     return bool(expected) and supplied == expected
+
+
+def _dash_creds():
+    """Dashboard login creds (DASH_USER/DASH_PASS in amo.env; defaults admin/M@...)."""
+    try:
+        import app
+        cfg = app.load_env() or {}
+    except Exception:
+        cfg = {}
+    return (cfg.get("DASH_USER") or "admin", cfg.get("DASH_PASS") or "M@$ter940NW")
 
 
 def _collect(since=None):
@@ -470,10 +482,276 @@ def funnel():
     return Response(html, mimetype="text/html; charset=utf-8")
 
 
+PAID_REV = ("paid", "ticket_issued", "checked_in")
+
+
+def _timeseries(since):
+    """Per-day {date, scans, leads, paid} over the range."""
+    wsc = "WHERE device!='bot'" + (" AND ts>=?" if since else "")
+    wre = "WHERE merged_into IS NULL" + (" AND created_at>=?" if since else "")
+    ps = [since] if since else []
+    c = reg._conn()
+    try:
+        sc = {r[0]: r[1] for r in c.execute(
+            "SELECT substr(ts,1,10) d, COUNT(*) FROM qr_scans %s GROUP BY d" % wsc, ps)}
+        ld = {r[0]: r[1] for r in c.execute(
+            "SELECT substr(created_at,1,10) d, COUNT(*) FROM registrations %s GROUP BY d" % wre, ps)}
+        pd = {r[0]: r[1] for r in c.execute(
+            "SELECT substr(COALESCE(paid_at,updated_at),1,10) d, COUNT(*) FROM registrations "
+            "WHERE merged_into IS NULL AND status IN ('paid','ticket_issued','checked_in')"
+            + (" AND COALESCE(paid_at,updated_at)>=?" if since else "") + " GROUP BY d", ps)}
+    finally:
+        c.close()
+    days = sorted(set(sc) | set(ld) | set(pd))
+    return [{"date": d, "scans": sc.get(d, 0), "leads": ld.get(d, 0), "paid": pd.get(d, 0)} for d in days]
+
+
+def _dash_data(days=None):
+    from datetime import timedelta
+    since = None
+    if days and days > 0:
+        since = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    codes, span = _collect(since)
+    by_flyer, by_channel = {}, {"tg": 0, "site": 0, "max": 0}
+    tot = {"scans": 0, "uniq": 0, "bots": 0, "mobile": 0, "leads": 0, "reg": 0, "paid": 0, "rev": 0}
+    for x in codes:
+        v = x["variant"] or "?"
+        f = by_flyer.setdefault(v, {"variant": v, "label": VARIANTS.get(v, "вариант " + v),
+                                    "scans": 0, "uniq": 0, "mobile": 0, "bots": 0,
+                                    "leads": 0, "reg": 0, "paid": 0, "rev": 0})
+        f["scans"] += x["hits"]; f["uniq"] += x["uniq"]; f["mobile"] += x["mobile"]; f["bots"] += x["bots"]
+        if x["channel"] in by_channel:
+            by_channel[x["channel"]] += x["hits"]
+        tot["scans"] += x["hits"]; tot["uniq"] += x["uniq"]; tot["bots"] += x["bots"]; tot["mobile"] += x["mobile"]
+    # attribution-based funnel (filtered by reg created_at)
+    attr = _attribute()
+    c = reg._conn()
+    try:
+        cre = {r["id"]: r["created_at"] for r in
+               c.execute("SELECT id, created_at FROM registrations WHERE merged_into IS NULL")}
+    finally:
+        c.close()
+    direct = {"leads": 0, "reg": 0, "paid": 0, "rev": 0}
+    for rid, a in attr.items():
+        if since and cre.get(rid, "") < since:
+            continue
+        money = (a.get("amount_paid") or a.get("price_eur") or 0) if a["paid"] else 0
+        tot["leads"] += 1
+        if a["status"] != "lead":
+            tot["reg"] += 1
+        if a["paid"]:
+            tot["paid"] += 1; tot["rev"] += money
+        b = by_flyer.get(a["variant"]) if a["variant"] else None
+        tgt = b if b is not None else (direct if not a["variant"] else None)
+        if tgt is not None:
+            tgt["leads"] += 1
+            if a["status"] != "lead":
+                tgt["reg"] += 1
+            if a["paid"]:
+                tgt["paid"] += 1; tgt["rev"] += money
+
+    def pct(a, b):
+        return round(100.0 * a / b, 1) if b else 0.0
+    flyers = sorted(by_flyer.values(), key=lambda r: (r["variant"] == "?", -r["scans"]))
+    return {
+        "period": {"from": (span["f"] or ""), "to": (span["l"] or ""), "days": days or 0},
+        "kpi": dict(tot,
+                    conv_scan_lead=pct(tot["leads"], tot["scans"]),
+                    conv_lead_paid=pct(tot["paid"], tot["leads"])),
+        "funnel": [
+            {"k": "Сканы (люди)", "v": tot["scans"]},
+            {"k": "Лиды", "v": tot["leads"], "conv": pct(tot["leads"], tot["scans"])},
+            {"k": "Регистрации", "v": tot["reg"], "conv": pct(tot["reg"], tot["leads"])},
+            {"k": "Оплаты", "v": tot["paid"], "conv": pct(tot["paid"], tot["reg"])},
+        ],
+        "by_channel": by_channel,
+        "by_flyer": [dict(f, conv=pct(f["paid"], f["leads"])) for f in flyers],
+        "timeseries": _timeseries(since),
+        "attribution": {"utm_ip": tot["leads"] - direct["leads"], "direct": direct["leads"]},
+        "direct": direct,
+    }
+
+
+@bp.route("/api/dash/data", methods=["GET"])
+def dash_data():
+    if not _auth_ok():
+        return jsonify({"error": "unauthorized"}), 401
+    days = request.args.get("days", type=int)
+    return jsonify(_dash_data(days))
+
+
+@bp.route("/dash/login", methods=["GET", "POST"])
+def dash_login():
+    u_ok, p_ok = _dash_creds()
+    if request.method == "POST":
+        if (request.form.get("u") == u_ok) and (request.form.get("p") == p_ok):
+            session["dash"] = True
+            session.permanent = True
+            return redirect("/dash")
+        return Response(LOGIN_HTML.replace("<!--ERR-->", "<div class=err>Неверный логин или пароль</div>"),
+                        mimetype="text/html; charset=utf-8")
+    if session.get("dash"):
+        return redirect("/dash")
+    return Response(LOGIN_HTML.replace("<!--ERR-->", ""), mimetype="text/html; charset=utf-8")
+
+
+@bp.route("/dash/logout", methods=["GET"])
+def dash_logout():
+    session.clear()
+    return redirect("/dash/login")
+
+
+@bp.route("/dash", methods=["GET"])
+def dash_page():
+    if not session.get("dash"):
+        return redirect("/dash/login")
+    return Response(DASH_HTML, mimetype="text/html; charset=utf-8")
+
+
 def register(flask_app):
     flask_app.register_blueprint(bp)
+    if not getattr(flask_app, "secret_key", None):
+        try:
+            import app
+            flask_app.secret_key = (app.load_env() or {}).get("INTERNAL_TOKEN") or "sato-dash-fallback"
+        except Exception:
+            flask_app.secret_key = "sato-dash-fallback"
     try:
         init()
     except Exception:
         log.exception("qrtrack init failed")
     log.info("qrtrack blueprint registered")
+
+
+LOGIN_HTML = """<!doctype html><html lang=ru><meta charset=utf-8>
+<meta name=viewport content="width=device-width,initial-scale=1">
+<title>Вход · Аналитика Казань-Токио 2026</title>
+<style>
+ body{margin:0;height:100vh;display:flex;align-items:center;justify-content:center;
+   font:15px/1.5 -apple-system,Segoe UI,Roboto,sans-serif;
+   background:linear-gradient(135deg,#0d1320,#13243d);color:#e7ecf3}
+ .card{background:#161f31;border:1px solid #24304a;border-radius:16px;padding:32px;width:320px;
+   box-shadow:0 20px 60px rgba(0,0,0,.4)}
+ h1{font-size:18px;margin:0 0 4px} .sub{color:#8a96a8;font-size:13px;margin-bottom:22px}
+ label{display:block;font-size:12px;color:#aab6c8;margin:12px 0 5px}
+ input{width:100%;box-sizing:border-box;padding:11px 12px;border-radius:9px;border:1px solid #2a3650;
+   background:#0f1726;color:#fff;font-size:15px}
+ button{width:100%;margin-top:20px;padding:12px;border:0;border-radius:9px;background:#2f7bff;color:#fff;
+   font-weight:700;font-size:15px;cursor:pointer}
+ button:hover{background:#1f6bf0}
+ .err{background:#3a1620;color:#ff8a9b;padding:9px 12px;border-radius:8px;font-size:13px;margin-bottom:14px}
+ .logo{font-size:26px;margin-bottom:8px}
+</style>
+<form class=card method=post action="/dash/login">
+ <div class=logo>📊</div>
+ <h1>Аналитика саммита</h1>
+ <div class=sub>Казань — Токио 2026</div>
+ <!--ERR-->
+ <label>Логин</label><input name=u autofocus autocomplete=username>
+ <label>Пароль</label><input name=p type=password autocomplete=current-password>
+ <button type=submit>Войти</button>
+</form></html>"""
+
+
+DASH_HTML = """<!doctype html><html lang=ru><meta charset=utf-8>
+<meta name=viewport content="width=device-width,initial-scale=1">
+<title>Аналитика · Казань-Токио 2026</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+ :root{--bg:#0d1320;--card:#161f31;--bd:#24304a;--mut:#8a96a8;--fg:#e7ecf3;--acc:#2f7bff}
+ *{box-sizing:border-box}
+ body{margin:0;font:14px/1.5 -apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--fg)}
+ header{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:16px 22px;border-bottom:1px solid var(--bd);position:sticky;top:0;background:var(--bg);z-index:5}
+ header h1{font-size:17px;margin:0;flex:0 0 auto}
+ .period{display:flex;gap:6px;margin-left:auto;flex-wrap:wrap}
+ .period button{background:var(--card);border:1px solid var(--bd);color:var(--fg);padding:7px 13px;border-radius:8px;cursor:pointer;font-size:13px}
+ .period button.on{background:var(--acc);border-color:var(--acc);font-weight:700}
+ .period a{color:var(--mut);text-decoration:none;padding:7px 10px;font-size:13px}
+ main{padding:22px;max-width:1200px;margin:0 auto}
+ .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-bottom:22px}
+ .kpi{background:var(--card);border:1px solid var(--bd);border-radius:13px;padding:16px 18px}
+ .kpi .n{font-size:28px;font-weight:800;line-height:1.1}
+ .kpi .k{color:var(--mut);font-size:12px;margin-top:4px}
+ .kpi .b{display:inline-block;margin-top:8px;font-size:12px;color:#7ee0a6;background:#13301f;padding:2px 8px;border-radius:20px}
+ .grid{display:grid;grid-template-columns:1.6fr 1fr;gap:18px;margin-bottom:18px}
+ @media(max-width:820px){.grid{grid-template-columns:1fr}}
+ .panel{background:var(--card);border:1px solid var(--bd);border-radius:13px;padding:18px}
+ .panel h2{font-size:14px;margin:0 0 14px;color:#c3cde0}
+ .funnel .row{margin:10px 0}
+ .funnel .lab{display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px}
+ .funnel .bar{height:26px;background:linear-gradient(90deg,#2f7bff,#46d3ff);border-radius:7px;min-width:2px}
+ .funnel .cv{color:var(--mut);font-size:12px}
+ table{width:100%;border-collapse:collapse;font-size:13px}
+ th,td{padding:9px 10px;text-align:left;border-bottom:1px solid #1e2840}
+ th{color:#aab6c8;font-weight:600} td.r,th.r{text-align:right}
+ .name{font-weight:600}
+ .muted{color:var(--mut)}
+</style>
+<header>
+ <h1>📊 Аналитика — Казань-Токио 2026</h1>
+ <div class=period id=per>
+   <button data-d=1>Сутки</button><button data-d=7 class=on>7 дней</button>
+   <button data-d=30>30 дней</button><button data-d=0>Всё время</button>
+   <a href="#" onclick="load();return false">⟳ Обновить</a>
+   <a href="/dash/logout">Выйти</a>
+ </div>
+</header>
+<main>
+ <div class=cards id=kpis></div>
+ <div class=grid>
+   <div class=panel><h2>Динамика по дням</h2><canvas id=ts height=110></canvas></div>
+   <div class=panel><h2>Каналы (сканы)</h2><canvas id=ch height=110></canvas></div>
+ </div>
+ <div class=grid>
+   <div class=panel><h2>Воронка: скан → лид → регистрация → оплата</h2><div class=funnel id=funnel></div></div>
+   <div class=panel><h2>Атрибуция лидов</h2><canvas id=attr height=110></canvas></div>
+ </div>
+ <div class=panel><h2>По флаерам</h2>
+   <table id=flyers><thead><tr><th>Флаер</th><th class=r>Сканы</th><th class=r>Уник.</th><th class=r>Лиды</th><th class=r>Оплаты</th><th class=r>Конв.</th><th class=r>Выручка</th></tr></thead><tbody></tbody></table>
+   <div class=muted id=period style="margin-top:10px;font-size:12px"></div>
+ </div>
+</main>
+<script>
+var DAYS=7, tsC=null, chC=null, atC=null;
+function el(id){return document.getElementById(id)}
+function card(n,k,b){return '<div class=kpi><div class=n>'+n+'</div><div class=k>'+k+'</div>'+(b?'<div class=b>'+b+'</div>':'')+'</div>'}
+function load(){
+ fetch('/api/dash/data?days='+DAYS).then(function(r){if(!r.ok)throw 0;return r.json()}).then(render).catch(function(){location.href='/dash/login'});
+}
+function render(d){
+ var k=d.kpi;
+ el('kpis').innerHTML=
+   card(k.scans,'Сканы (люди)','уник. '+k.uniq)+
+   card(k.leads,'Лиды',k.conv_scan_lead+'% от сканов')+
+   card(k.reg,'Регистрации','')+
+   card(k.paid,'Оплаты',k.conv_lead_paid+'% от лидов')+
+   card((k.rev||0)+' €','Выручка','')+
+   card(k.bots,'Боты (искл.)','');
+ // funnel
+ var f=d.funnel, mx=Math.max(1,f[0].v), h='';
+ f.forEach(function(s){var w=Math.round(100*s.v/mx);
+   h+='<div class=row><div class=lab><span>'+s.k+'</span><span>'+s.v+(s.conv!=null?' <span class=cv>('+s.conv+'%)</span>':'')+'</span></div><div class=bar style="width:'+w+'%"></div></div>';});
+ el('funnel').innerHTML=h;
+ // flyers
+ var tb=el('flyers').querySelector('tbody'), rows='';
+ (d.by_flyer||[]).forEach(function(x){rows+='<tr><td class=name>'+x.label+'</td><td class=r>'+x.scans+'</td><td class=r>'+x.uniq+'</td><td class=r>'+x.leads+'</td><td class=r>'+x.paid+'</td><td class=r>'+x.conv+'%</td><td class=r>'+(x.rev||0)+' €</td></tr>';});
+ if(d.direct&&(d.direct.leads||d.direct.paid))rows+='<tr><td class="name muted">Без атрибуции</td><td class=r>·</td><td class=r>·</td><td class=r>'+d.direct.leads+'</td><td class=r>'+d.direct.paid+'</td><td class=r>·</td><td class=r>'+(d.direct.rev||0)+' €</td></tr>';
+ tb.innerHTML=rows;
+ var p=d.period; el('period').textContent='Период: '+(p.from||'').slice(0,10)+' — '+(p.to||'').slice(0,10)+(p.days?(' · '+p.days+' дн.'):' · всё время');
+ drawTS(d.timeseries||[]); drawCh(d.by_channel||{}); drawAttr(d.attribution||{});
+}
+function drawTS(ts){var lab=ts.map(function(x){return x.date.slice(5)});
+ if(tsC)tsC.destroy();
+ tsC=new Chart(el('ts'),{type:'line',data:{labels:lab,datasets:[
+   {label:'Сканы',data:ts.map(function(x){return x.scans}),borderColor:'#46d3ff',backgroundColor:'transparent',tension:.3},
+   {label:'Лиды',data:ts.map(function(x){return x.leads}),borderColor:'#2f7bff',backgroundColor:'transparent',tension:.3},
+   {label:'Оплаты',data:ts.map(function(x){return x.paid}),borderColor:'#7ee0a6',backgroundColor:'transparent',tension:.3}]},
+   options:{plugins:{legend:{labels:{color:'#aab6c8'}}},scales:{x:{ticks:{color:'#8a96a8'},grid:{color:'#1e2840'}},y:{ticks:{color:'#8a96a8'},grid:{color:'#1e2840'},beginAtZero:true}}}});}
+function drawCh(c){if(chC)chC.destroy();
+ chC=new Chart(el('ch'),{type:'doughnut',data:{labels:['Telegram','Сайт','MAX'],datasets:[{data:[c.tg||0,c.site||0,c.max||0],backgroundColor:['#229ED9','#2f7bff','#7e57ff']}]},options:{plugins:{legend:{labels:{color:'#aab6c8'}}}}});}
+function drawAttr(a){if(atC)atC.destroy();
+ atC=new Chart(el('attr'),{type:'doughnut',data:{labels:['Атрибутировано (utm/IP)','Без атрибуции'],datasets:[{data:[a.utm_ip||0,a.direct||0],backgroundColor:['#7ee0a6','#46506a']}]},options:{plugins:{legend:{labels:{color:'#aab6c8'}}}}});}
+el('per').addEventListener('click',function(e){var b=e.target.closest('button');if(!b)return;
+ DAYS=+b.dataset.d;[].forEach.call(el('per').querySelectorAll('button'),function(x){x.classList.remove('on')});b.classList.add('on');load();});
+load(); setInterval(load,60000);
+</script></html>"""
