@@ -47,8 +47,15 @@ print(app.amo_request(c,'POST','/api/v4/webhooks',{'destination':url,'settings':
 ```
 
 ### 2. SSL (Let's Encrypt)
-**ВАЖНО (RU-серверы):** HTTP-01 часто не проходит (гео/edge режет :80 для валидаторов).
-Используем **DNS-01** (acme.sh):
+**НЕ-RU сервер (NL/EU) — предпочтительно `certbot --nginx` (HTTP-01, авто-renew):**
+```bash
+certbot --nginx --non-interactive --agree-tos -m admin@sadaosato.pro --redirect \
+  -d sadaosato.pro -d www.sadaosato.pro
+certbot --nginx --non-interactive --agree-tos -m admin@sadaosato.pro --redirect -d tickets.sadaosato.pro
+# certbot.timer продлевает сам; проверка: certbot certificates
+```
+**RU-сервер:** HTTP-01 часто не проходит (гео/edge режет :80 для валидаторов).
+Тогда **DNS-01** (acme.sh, ручной TXT, БЕЗ авто-renew):
 ```bash
 curl https://get.acme.sh | sh -s email=admin@sadaosato.pro
 ~/.acme.sh/acme.sh --set-default-ca --server letsencrypt
