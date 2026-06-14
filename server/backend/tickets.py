@@ -558,7 +558,7 @@ def api_reg_find():
             return jsonify(ok=True, found=False)
         row = dict(row)
         return jsonify(ok=True, found=True, reg={k: row.get(k) for k in
-                       ("id","full_name","phone_e164","email_lc","package","price_eur","status","telegram_user_id","ticket_id")})
+                       ("id","full_name","phone_e164","email_lc","city","format","package","price_eur","status","telegram_user_id","ticket_id")})
     finally:
         c.close()
 

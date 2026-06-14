@@ -725,6 +725,7 @@ def api_lead():
 
     # ---- (4) always respond ok ----
     # Mirror into the local operational registrations store + consent audit (never fatal).
+    _rid = None
     try:
         import reg
         _tg = payload.get("tg_id") or payload.get("telegram_user_id")
@@ -752,7 +753,16 @@ def api_lead():
     except Exception as _exc:
         logger.error("reg mirror failed: %s", _exc)
 
-    return jsonify({"ok": True, "id": lead_id})
+    # Site→Telegram handoff: hand the canonical reg_id to the success screen so it
+    # can deep-link into the bot (t.me/<bot>?start=<reg_id>). reg_id is an unguessable
+    # uuid4 hex (≤32 chars, fits Telegram's 64-char start payload) and acts as a
+    # bearer prefill key — the bot resolves it via /api/reg/find and recognizes the
+    # same client (dedup by phone/tg in link_identity). Only for WEB leads.
+    resp = {"ok": True, "id": lead_id, "reg_id": _rid}
+    if _rid and not (payload.get("tg_id") or payload.get("telegram_user_id")):
+        bot = (cfg.get("BOT_USERNAME") or "sadaosato_bot").lstrip("@")
+        resp["tg_url"] = "https://t.me/%s?start=%s" % (bot, _rid)
+    return jsonify(resp)
 
 
 @app.route("/api/event", methods=["POST", "OPTIONS"])

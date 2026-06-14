@@ -1,13 +1,20 @@
-"""/start, greeting, consent line and the subscription gate recheck."""
+"""/start, greeting, consent line and the subscription gate recheck.
+
+Site→Telegram handoff: лендинг ведёт в `t.me/<bot>?start=<reg_id>`. Резолвим reg_id
+в бэкенде, префиллим регистрацию из заявки с сайта (имя/телефон/город/тариф) и не
+переспрашиваем — одна сделка, без дубля (link_identity сольёт сайт+TG по телефону)."""
 from __future__ import annotations
 
 import logging
+import re
 
+import aiohttp
 from aiogram import Bot, F, Router
-from aiogram.filters import CommandStart
+from aiogram.filters import CommandObject, CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
+import config
 import content
 import db
 import keyboards
@@ -19,16 +26,47 @@ from . import common
 log = logging.getLogger(__name__)
 router = Router(name="start")
 
+_REGID_RE = re.compile(r"^[0-9a-fA-F]{16,40}$")
+
+
+async def _fetch_prefill(reg_id: str) -> dict | None:
+    """Resolve a site lead by reg_id via the loopback backend → prefill dict."""
+    try:
+        base = config.LEAD_API_URL.split("/api/")[0]
+        async with aiohttp.ClientSession() as s:
+            async with s.get(base + "/api/reg/find", params={"q": reg_id},
+                             headers={"X-Internal-Token": getattr(config, "INTERNAL_TOKEN", "")},
+                             timeout=aiohttp.ClientTimeout(total=10)) as r:
+                d = await r.json()
+        if d.get("found") and d.get("reg", {}).get("phone_e164"):
+            rg = d["reg"]
+            return {"reg_id": rg.get("id"), "name": rg.get("full_name") or "",
+                    "phone": rg.get("phone_e164") or "", "city": rg.get("city") or "",
+                    "package": rg.get("package"), "format": rg.get("format")}
+    except Exception:
+        log.warning("prefill fetch failed for deep-link payload")
+    return None
+
 
 @router.message(CommandStart())
-async def cmd_start(message: Message, bot: Bot, state: FSMContext) -> None:
+async def cmd_start(message: Message, bot: Bot, state: FSMContext,
+                    command: CommandObject) -> None:
     await state.clear()
     user = message.from_user
     await db.upsert_user_basic(user.id, user.username)
 
-    await message.answer(
-        content.GREETING, disable_web_page_preview=True
-    )
+    pf = None
+    payload = (command.args or "").strip()
+    if _REGID_RE.match(payload):
+        pf = await _fetch_prefill(payload)
+        if pf:
+            await state.update_data(prefill=pf)
+
+    greet = content.GREETING
+    if pf and pf.get("name"):
+        greet = ("С возвращением, %s! 👋\nЗавершим регистрацию по вашей заявке с сайта — "
+                 "данные уже у меня, перезаполнять не нужно." % pf["name"])
+    await message.answer(greet, disable_web_page_preview=True)
 
     subscribed = await common.ensure_subscribed_then_gate(
         bot, message.chat.id, user.id

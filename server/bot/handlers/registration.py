@@ -161,5 +161,42 @@ async def reg_consent_ok(cb: CallbackQuery, state: FSMContext, bot: Bot) -> None
     except Exception:
         pass
     await cb.answer("Согласие зафиксировано ✅")
+    # Site→TG deep-link: данные уже есть из заявки → не спрашиваем телефон заново.
+    pf = (await state.get_data()).get("prefill")
+    if pf and pf.get("phone"):
+        await _finish_from_prefill(cb, state, bot, pf)
+        return
     await bot.send_message(cb.message.chat.id, content.REG_ASK_PHONE, reply_markup=keyboards.phone_request_kb())
     await state.set_state(Registration.phone)
+
+
+async def _finish_from_prefill(cb: CallbackQuery, state: FSMContext, bot: Bot, pf: dict) -> None:
+    """Завершить регистрацию из заявки с сайта (deep-link), без перезаполнения.
+    lead.send_lead с тем же телефоном → backend link_identity сольёт сайт+TG в одну
+    сделку и проставит telegram_user_id (доставка билета/инфы в TG)."""
+    user = cb.from_user
+    name = pf.get("name") or (user.full_name or "Гость")
+    phone = pf.get("phone") or ""
+    city = pf.get("city") or ""
+    existing = await db.get_user(user.id)
+    already = bool(existing and existing["registered"])
+    await db.complete_registration(user.id, user.username, name, phone, city)
+    await state.clear()
+    if not already:
+        payload = lead.build_lead_payload(
+            name=name, phone=phone, city=city, username=user.username, tg_id=user.id,
+        )
+        payload["message"] = "Завершение заявки с сайта в боте (deep-link). " + payload["message"]
+        await lead.send_lead(user.id, payload)
+        await amojo_bridge.push_to_amojo(
+            user.id, name=name, username=user.username, phone=phone,
+            text=("Завершил регистрацию из заявки с сайта."
+                  + (f" Тариф: {pf.get('package')}." if pf.get("package") else "")),
+            message_id=cb.message.message_id,
+        )
+        try:
+            await funnel.schedule_drip_for_user(user.id)
+        except Exception:
+            log.exception("Failed to schedule drip for %s", user.id)
+    await bot.send_message(cb.message.chat.id, content.REG_DONE)
+    await common.show_main_menu(bot, cb.message.chat.id)
