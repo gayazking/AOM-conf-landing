@@ -64,8 +64,12 @@ async def cmd_start(message: Message, bot: Bot, state: FSMContext,
 
     greet = content.GREETING
     if pf and pf.get("name"):
-        greet = ("С возвращением, %s! 👋\nЗавершим регистрацию по вашей заявке с сайта — "
-                 "данные уже у меня, перезаполнять не нужно." % pf["name"])
+        greet = ("С возвращением, %s! 👋\n"
+                 "Завершим регистрацию по вашей заявке с сайта — данные уже у меня, "
+                 "перезаполнять не нужно.\n\n"
+                 "Здесь, в боте, — вся информация о саммите: программа, спикеры и их "
+                 "биографии, профессор Садао Сато, где остановиться в Казани, "
+                 "и оплата участия." % pf["name"])
     await message.answer(greet, disable_web_page_preview=True)
 
     subscribed = await common.ensure_subscribed_then_gate(
