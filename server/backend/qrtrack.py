@@ -156,13 +156,13 @@ def _auth_ok():
 
 
 def _dash_creds():
-    """Dashboard login creds (DASH_USER/DASH_PASS in amo.env; defaults admin/M@...)."""
+    """Dashboard login creds — read from DASH_USER/DASH_PASS in amo.env (no secret in code)."""
     try:
         import app
         cfg = app.load_env() or {}
     except Exception:
         cfg = {}
-    return (cfg.get("DASH_USER") or "admin", cfg.get("DASH_PASS") or "M@$ter940NW")
+    return (cfg.get("DASH_USER") or "admin", cfg.get("DASH_PASS") or "change-me")
 
 
 def _collect(since=None):
@@ -506,6 +506,41 @@ def _timeseries(since):
     return [{"date": d, "scans": sc.get(d, 0), "leads": ld.get(d, 0), "paid": pd.get(d, 0)} for d in days]
 
 
+def _by_source(since=None):
+    """Сквозная разбивка по рекламным источникам/кампаниям из registrations:
+    источник·канал·кампания → лиды / регистрации / оплаты / выручка / план.
+    Источник склейки с Метрикой — utm_* (+ ym_client_id для офлайн-конверсий)."""
+    c = reg._conn()
+    try:
+        ps = (since,) if since else ()
+        wre = "WHERE merged_into IS NULL" + (" AND created_at>=?" if since else "")
+        rows = c.execute(
+            "SELECT utm_source, utm_medium, utm_campaign, status, "
+            "amount_paid, price_eur FROM registrations " + wre, ps).fetchall()
+    finally:
+        c.close()
+    agg = {}
+    for r in rows:
+        src = (r["utm_source"] or "(direct)")
+        med = (r["utm_medium"] or "")
+        camp = (r["utm_campaign"] or "")
+        key = (src, med, camp)
+        a = agg.setdefault(key, {"source": src, "medium": med, "campaign": camp,
+                                 "leads": 0, "reg": 0, "paid": 0, "rev": 0, "plan": 0})
+        paid = r["status"] in PAID_STATES
+        a["leads"] += 1
+        if r["status"] != "lead":
+            a["reg"] += 1
+        a["plan"] += (r["price_eur"] or 0)
+        if paid:
+            a["paid"] += 1
+            a["rev"] += (r["amount_paid"] or r["price_eur"] or 0)
+    out = list(agg.values())
+    for a in out:
+        a["conv"] = round(100.0 * a["paid"] / a["leads"], 1) if a["leads"] else 0.0
+    return sorted(out, key=lambda x: (-x["paid"], -x["leads"]))
+
+
 def _dash_data(days=None):
     from datetime import timedelta
     since = None
@@ -554,6 +589,7 @@ def _dash_data(days=None):
         return round(100.0 * a / b, 1) if b else 0.0
     flyers = sorted(by_flyer.values(), key=lambda r: (r["variant"] == "?", -r["scans"]))
     return {
+        "by_source": _by_source(since),
         "period": {"from": (span["f"] or ""), "to": (span["l"] or ""), "days": days or 0},
         "kpi": dict(tot,
                     conv_scan_lead=pct(tot["leads"], tot["scans"]),
@@ -710,6 +746,10 @@ DASH_HTML = """<!doctype html><html lang=ru><meta charset=utf-8>
    <table id=flyers><thead><tr><th>Флаер</th><th class=r>Сканы</th><th class=r>Уник.</th><th class=r>Лиды</th><th class=r>Оплаты</th><th class=r>Конв.</th><th class=r>Выручка</th></tr></thead><tbody></tbody></table>
    <div class=muted id=period style="margin-top:10px;font-size:12px"></div>
  </div>
+ <div class=panel><h2>Источники трафика (UTM · сквозная)</h2>
+   <table id=sources><thead><tr><th>Источник</th><th>Канал</th><th>Кампания</th><th class=r>Лиды</th><th class=r>Рег.</th><th class=r>Оплаты</th><th class=r>Конв.</th><th class=r>Выручка</th><th class=r>План</th></tr></thead><tbody></tbody></table>
+   <div class=muted style="margin-top:8px;font-size:12px">«Источник/Канал/Кампания» = utm_source/utm_medium/utm_campaign из заявки. «(direct)» — без меток. Оплата+выручка приходят при переводе сделки в «Оплачено» (и шлются офлайн-конверсией в Метрику).</div>
+ </div>
 </main>
 <script>
 var DAYS=7, tsC=null, chC=null, atC=null;
@@ -738,6 +778,10 @@ function render(d){
  if(d.direct&&(d.direct.leads||d.direct.paid))rows+='<tr><td class="name muted">Без атрибуции</td><td class=r>·</td><td class=r>·</td><td class=r>'+d.direct.leads+'</td><td class=r>'+d.direct.paid+'</td><td class=r>·</td><td class=r>'+(d.direct.rev||0)+' €</td></tr>';
  tb.innerHTML=rows;
  var p=d.period; el('period').textContent='Период: '+(p.from||'').slice(0,10)+' — '+(p.to||'').slice(0,10)+(p.days?(' · '+p.days+' дн.'):' · всё время');
+ // источники (UTM, сквозная)
+ var sb=el('sources').querySelector('tbody'), srows='';
+ (d.by_source||[]).forEach(function(x){srows+='<tr><td class=name>'+(x.source||'')+'</td><td>'+(x.medium||'')+'</td><td>'+(x.campaign||'')+'</td><td class=r>'+x.leads+'</td><td class=r>'+x.reg+'</td><td class=r>'+x.paid+'</td><td class=r>'+x.conv+'%</td><td class=r>'+(x.rev||0)+' €</td><td class=r>'+(x.plan||0)+' €</td></tr>';});
+ sb.innerHTML=srows||'<tr><td colspan=9 class=muted>нет данных</td></tr>';
  drawTS(d.timeseries||[]); drawCh(d.by_channel||{}); drawAttr(d.attribution||{});
 }
 function drawTS(ts){var lab=ts.map(function(x){return x.date.slice(5)});

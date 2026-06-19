@@ -163,6 +163,7 @@ def _email_ticket(cfg, to_email, pdf_bytes, png_bytes, human_code, name, package
     import smtplib
     import ssl
     from email.message import EmailMessage
+    from email.utils import formataddr
     try:
         port = int(cfg.get("SMTP_PORT") or 587)
     except Exception:
@@ -170,10 +171,13 @@ def _email_ticket(cfg, to_email, pdf_bytes, png_bytes, human_code, name, package
     user = cfg.get("SMTP_USER") or ""
     pw = cfg.get("SMTP_PASS") or ""
     sender = cfg.get("SMTP_FROM") or user or "no-reply@sadaosato.pro"
+    # Friendly display name (RFC2047-encoded for Cyrillic) instead of the bare
+    # mailbox login. Configurable via SMTP_FROM_NAME.
+    from_name = cfg.get("SMTP_FROM_NAME") or "Отдел заботы саммита «Казань — Токио 2026»"
     pl = _PKG_LABEL.get(str(package_label), package_label or "Участие")
     msg = EmailMessage()
     msg["Subject"] = "Ваш билет — саммит «Казань — Токио 2026»"
-    msg["From"] = sender
+    msg["From"] = formataddr((from_name, sender))
     msg["To"] = to_email
     msg.set_content(
         "Здравствуйте, %s!\n\nВаша оплата подтверждена. Билет на международный стоматологический "
@@ -194,11 +198,15 @@ def _email_ticket(cfg, to_email, pdf_bytes, png_bytes, human_code, name, package
         else:
             with smtplib.SMTP(host, port, timeout=20) as s:
                 s.ehlo()
-                try:
-                    s.starttls(context=ctx)
-                    s.ehlo()
-                except Exception:
-                    pass
+                # localhost relay (exim on the same box) is trusted and may not
+                # offer a usable STARTTLS — send plaintext over the loopback.
+                local = host in ("127.0.0.1", "::1", "localhost")
+                if not local:
+                    try:
+                        s.starttls(context=ctx)
+                        s.ehlo()
+                    except Exception:
+                        pass
                 if user:
                     s.login(user, pw)
                 s.send_message(msg)

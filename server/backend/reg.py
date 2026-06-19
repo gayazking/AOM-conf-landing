@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS registrations(
   city TEXT, clinic TEXT, specialty TEXT, badge_name TEXT,
   source TEXT, telegram_user_id INTEGER, telegram_username TEXT,
   utm_source TEXT, utm_medium TEXT, utm_campaign TEXT, utm_content TEXT, utm_term TEXT,
+  ym_client_id TEXT, yclid TEXT, page_url TEXT,
   format TEXT, channel TEXT, message TEXT,
   package TEXT, price_eur INTEGER, currency TEXT DEFAULT 'EUR',
   amocrm_lead_id INTEGER, amocrm_contact_id INTEGER,
@@ -89,10 +90,13 @@ def _conn():
 def init():
     c = _conn()
     c.executescript(SCHEMA)
-    # migrate: add merged_into to a pre-existing registrations table
+    # migrate: add columns to a pre-existing registrations table
     cols = {r[1] for r in c.execute("PRAGMA table_info(registrations)")}
     if "merged_into" not in cols:
         c.execute("ALTER TABLE registrations ADD COLUMN merged_into TEXT")
+    for _mcol in ("ym_client_id", "yclid", "page_url"):
+        if _mcol not in cols:
+            c.execute("ALTER TABLE registrations ADD COLUMN %s TEXT" % _mcol)
     c.execute("CREATE INDEX IF NOT EXISTS ix_reg_merged ON registrations(merged_into)")
     c.commit()
     c.close()
@@ -132,7 +136,8 @@ STATUS_RANK = {"lead": 0, "registered": 1, "paid": 2, "ticket_issued": 3, "check
 _FILL = ["full_name", "phone_e164", "email_lc", "telegram_user_id", "telegram_username",
          "city", "clinic", "specialty", "badge_name", "message", "currency"]
 # first-touch marketing attribution — taken from the OLDEST record, never overwritten
-_FIRST_TOUCH = ["source", "channel", "utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term"]
+_FIRST_TOUCH = ["source", "channel", "utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term",
+                "ym_client_id", "yclid", "page_url"]
 # payment / fulfilment block — copied as a unit from whichever record actually paid
 _PAYMENT = ["payment_provider", "payment_id", "payment_link", "amount_paid", "paid_at",
             "ticket_id", "ticket_issued_at", "qr_delivered_channels",
@@ -277,6 +282,9 @@ def link_identity(rec):
         "utm_source": rec.get("utm_source"), "utm_medium": rec.get("utm_medium"),
         "utm_campaign": rec.get("utm_campaign"), "utm_content": rec.get("utm_content"),
         "utm_term": rec.get("utm_term"),
+        "ym_client_id": (rec.get("ym_client_id") or "").strip() or None,
+        "yclid": (rec.get("yclid") or "").strip() or None,
+        "page_url": rec.get("page_url") or None,
         "format": rec.get("format"), "channel": rec.get("channel"), "message": rec.get("message"),
         "package": rec.get("package") or (str(price) if price else None), "price_eur": price,
         "amocrm_lead_id": rec.get("amocrm_lead_id"), "amocrm_contact_id": rec.get("amocrm_contact_id"),

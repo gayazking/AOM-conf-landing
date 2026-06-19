@@ -379,10 +379,39 @@ def build_complex_lead(cfg, lead):
             "field_code": "EMAIL",
             "values": [{"value": email, "enum_code": "WORK"}],
         })
+    # Telegram nick -> contact custom field (id from env AMO_CF_CT_TELEGRAM).
+    _tg_nick = (lead.get("telegram_username") or lead.get("username") or "").strip().lstrip("@")
+    _tg_fid = (cfg.get("AMO_CF_CT_TELEGRAM") or "").strip()
+    if _tg_nick and _tg_fid:
+        try:
+            contact_fields.append({"field_id": int(_tg_fid),
+                                   "values": [{"value": "@" + _tg_nick}]})
+        except ValueError:
+            logger.error("invalid AMO_CF_CT_TELEGRAM in env: %r", _tg_fid)
 
     contact = {"name": (lead.get("name") or "Без имени").strip()}
     if contact_fields:
         contact["custom_fields_values"] = contact_fields
+
+    # Structured marketing attribution on the DEAL (custom fields). Field IDs come
+    # from env (set by create_amo_fields.py). Only emit a field if both the env id
+    # and the lead value are present — so end-to-end (Метрика↔amo) reports can group
+    # by source/campaign and offline-conversions can find the Metrika ClientID.
+    deal_cf = []
+    _cf_map = [
+        ("AMO_CF_UTM_SOURCE", "utm_source"), ("AMO_CF_UTM_MEDIUM", "utm_medium"),
+        ("AMO_CF_UTM_CAMPAIGN", "utm_campaign"), ("AMO_CF_UTM_CONTENT", "utm_content"),
+        ("AMO_CF_UTM_TERM", "utm_term"), ("AMO_CF_YM_CLIENT_ID", "ym_client_id"),
+        ("AMO_CF_YCLID", "yclid"), ("AMO_CF_PAGE_URL", "page_url"),
+    ]
+    for _env_key, _lead_key in _cf_map:
+        _fid = (cfg.get(_env_key) or "").strip()
+        _val = (lead.get(_lead_key) or "").strip() if lead.get(_lead_key) else ""
+        if _fid and _val:
+            try:
+                deal_cf.append({"field_id": int(_fid), "values": [{"value": _val[:255]}]})
+            except ValueError:
+                logger.error("invalid %s in env: %r", _env_key, _fid)
 
     obj = {
         "name": "Заявка с сайта — Лендинг конференции Казань-Токио 2026",
@@ -392,6 +421,8 @@ def build_complex_lead(cfg, lead):
             "contacts": [contact],
         },
     }
+    if deal_cf:
+        obj["custom_fields_values"] = deal_cf
     if cfg.get("PIPELINE_ID"):
         try:
             obj["pipeline_id"] = int(cfg["PIPELINE_ID"])
@@ -678,9 +709,9 @@ def api_lead():
         "name", "phone", "email", "city", "format", "channel", "message",
         "consent", "consent_oferta", "consent_pdn", "page_url", "referrer",
         "utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term",
-        "gclid", "yclid", "fbclid",
+        "gclid", "yclid", "fbclid", "ym_client_id",
         "first_visit_ts", "submit_ts", "user_agent", "screen",
-        "tg_id", "external_id",
+        "tg_id", "external_id", "username", "telegram_username",
     ]
     record = {k: payload.get(k) for k in fields}
     record["server_ts"] = now_iso()
@@ -1116,6 +1147,13 @@ def amo_lead_webhook(path_key=None):
         return jsonify({"ok": True, **res})
     return jsonify({"ok": True, "ignored": "no_event"})
 
+
+try:
+    import reg as _reg
+    _reg.init()            # self-migrate registrations schema (idempotent ALTERs) on every boot
+    logger.info("reg schema initialized/migrated")
+except Exception:
+    logger.exception("reg init failed")
 
 try:
     import desk

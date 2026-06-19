@@ -60,6 +60,9 @@ def build_lead_payload(
         "utm_source": "telegram-bot",
         "utm_medium": "bot",
         "page_url": "https://t.me/sadaosato_bot",
+        # Telegram nick -> amo contact field "Telegram" (and local store).
+        "username": username,
+        "telegram_username": username,
         # Stable idempotency / dedupe keys for the backend & amoCRM.
         "tg_id": tg_id,
         "external_id": f"tgbot-{tg_id}",

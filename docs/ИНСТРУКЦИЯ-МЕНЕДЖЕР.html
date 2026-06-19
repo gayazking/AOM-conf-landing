@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Инструкция менеджеру — Казань-Токио 2026</title>
+<style>
+  :root{
+    --bg:#f4f6fb; --card:#fff; --ink:#1f2733; --muted:#6b7689;
+    --line:#e3e8f0; --brand:#6b39c4;
+    --green:#1f9d57; --green-bg:#e8f7ee; --red:#d8341f; --red-bg:#fdecea;
+    --amber:#b7791f; --amber-bg:#fcf3e1; --blue:#1f6fd8; --blue-bg:#eaf2fd;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font:16px/1.6 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+       padding:32px 16px}
+  .wrap{max-width:860px;margin:0 auto}
+  header.head{background:linear-gradient(135deg,#6b39c4,#9b51e0);color:#fff;
+       border-radius:18px;padding:28px 30px;margin-bottom:22px;
+       box-shadow:0 10px 30px rgba(107,57,196,.25)}
+  header.head h1{margin:0 0 6px;font-size:26px}
+  header.head p{margin:0;opacity:.92;font-size:15px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;
+        padding:22px 26px;margin-bottom:18px;box-shadow:0 2px 10px rgba(20,30,50,.04)}
+  h2{font-size:19px;margin:0 0 14px;padding-bottom:10px;border-bottom:2px solid var(--line);
+     display:flex;align-items:center;gap:10px}
+  h2 .num{background:#6b39c4;color:#fff;width:28px;height:28px;border-radius:8px;
+     display:inline-flex;align-items:center;justify-content:center;font-size:15px;flex:0 0 auto}
+  h3{font-size:16px;margin:18px 0 8px}
+  table{border-collapse:collapse;width:100%;margin:6px 0;font-size:15px}
+  th,td{border:1px solid var(--line);padding:9px 12px;text-align:left;vertical-align:top}
+  th{background:#f0f2f8;font-weight:600}
+  .callout{border-radius:12px;padding:14px 16px;margin:14px 0;border:1px solid}
+  .callout b{display:block;margin-bottom:4px}
+  .c-red{background:var(--red-bg);border-color:#f3c2bb;color:#7d1f12}
+  .c-green{background:var(--green-bg);border-color:#bfe7cd;color:#13633a}
+  .c-amber{background:var(--amber-bg);border-color:#eedcae;color:#7a531a}
+  .c-blue{background:var(--blue-bg);border-color:#c3dbf7;color:#16498f}
+  ul,ol{margin:8px 0;padding-left:22px}
+  li{margin:5px 0}
+  code{background:#eef0f6;border:1px solid var(--line);border-radius:6px;
+       padding:1px 6px;font-size:14px}
+  .pill{display:inline-block;background:#efe7fb;color:#6b39c4;border-radius:20px;
+        padding:2px 12px;font-size:13px;font-weight:600;margin:2px 4px 2px 0}
+  .flow{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:10px 0}
+  .flow .st{background:#f0f2f8;border:1px solid var(--line);border-radius:10px;padding:8px 12px;font-size:14px}
+  .flow .arr{color:var(--muted);font-weight:700}
+  .flow .win{background:var(--green-bg);border-color:#bfe7cd;color:#13633a;font-weight:600}
+  .check{list-style:none;padding-left:0}
+  .check li{padding-left:30px;position:relative}
+  .check li::before{content:"☐";position:absolute;left:0;font-size:18px;color:#6b39c4}
+  .no{list-style:none;padding-left:0}
+  .no li{padding-left:28px;position:relative}
+  .no li::before{content:"✕";position:absolute;left:0;color:var(--red);font-weight:700}
+  footer{color:var(--muted);font-size:13px;text-align:center;margin-top:20px}
+  @media print{
+    body{background:#fff;padding:0;font-size:13px}
+    .card,header.head{box-shadow:none}
+    header.head{background:#6b39c4 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    .callout,th,.flow .st{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    .card{break-inside:avoid}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="head">
+  <h1>Инструкция менеджеру — приём и обработка заявок</h1>
+  <p>Саммит «Казань — Токио 2026». Единая система: <b>все заявки → amoCRM, одна сделка = один человек = один телефон.</b> Билет выдаётся после подтверждения оплаты и доставляется автоматически (Telegram или e-mail).</p>
+</header>
+
+<section class="card">
+  <h2><span class="num">1</span>Откуда приходят заявки</h2>
+  <table>
+    <tr><th>Источник</th><th>Как попадает в amoCRM</th><th>Что уже заполнено</th></tr>
+    <tr><td><b>Сайт</b> (форма на sadaosato.pro)</td><td>Автоматически, этап «Рег. без оплаты»</td><td>Имя, телефон, e-mail, тариф, источник</td></tr>
+    <tr><td><b>Telegram-бот</b> (@sadaosato_bot)</td><td>Автоматически, этап «Рег. без оплаты»</td><td>Имя, телефон, город, Telegram</td></tr>
+    <tr><td><b>Звонок</b></td><td><b>Заносите вручную</b></td><td>—</td></tr>
+    <tr><td><b>Личные сообщения / другое</b></td><td><b>Заносите вручную</b></td><td>—</td></tr>
+  </table>
+  <p>Сайт и бот <b>связаны</b>: человек оставил заявку на сайте → его ведёт в Telegram-бот, где он видит программу, спикеров, отели и оплачивает. Данные подтягиваются сами — повторно он ничего не вводит.</p>
+</section>
+
+<section class="card">
+  <h2><span class="num">2</span>Главное правило — антидубль</h2>
+  <p><b>Телефон — это «паспорт» клиента.</b> Перед тем как завести сделку вручную:</p>
+  <div class="callout c-blue">
+    <b>🔎 Сначала найдите телефон в amoCRM (поиск сверху).</b>
+    Нашлась сделка → работайте в НЕЙ, не создавайте новую.<br>
+    Не нашлась → создавайте новую.
+  </div>
+  <p>Телефон вводите как удобно (<code>+7…</code>, <code>8…</code>, <code>7…</code>) — система приводит к одному виду и сама склеивает заявки сайта и бота по телефону. <b>Вам склеивать сайт+бот не нужно — это автоматически.</b></p>
+  <h3>Когда всё-таки появятся 2 карточки на одного</h3>
+  <p>Например: вы завели со звонка, а человек потом сам оставил на сайте. Тогда система создаст <b>задачу «Объедините сделки #A и #B»</b>:</p>
+  <ol>
+    <li>Откройте обе сделки, проверьте что это один человек (телефон).</li>
+    <li>Объедините их в amoCRM (перенесите примечания/оплату в более раннюю, лишнюю закройте).</li>
+    <li>Закройте задачу.</li>
+  </ol>
+  <div class="callout c-amber"><b>⚠️ amoCRM сам сделки НЕ объединяет</b> — поэтому правило поиска по телефону обязательно.</div>
+</section>
+
+<section class="card">
+  <h2><span class="num">3</span>Обязательные поля сделки</h2>
+  <p>Без них билет не выпустится:</p>
+  <ul>
+    <li><b>ФИО</b></li>
+    <li><b>Телефон</b> (главный ключ)</li>
+    <li><b>Тариф</b> — поле «Тариф»: <span class="pill">500 €</span><span class="pill">800 €</span><span class="pill">1000 €</span><span class="pill">1800 €</span> Без тарифа билет не выпускается (система поставит задачу «укажи тариф»).</li>
+    <li><b>Канал для билета:</b> Telegram (приоритет) или e-mail. См. §5.</li>
+  </ul>
+</section>
+
+<section class="card">
+  <h2><span class="num">4</span>Этапы воронки</h2>
+  <div class="flow">
+    <span class="st">Неразобранное</span><span class="arr">→</span>
+    <span class="st">Рег. без оплаты</span><span class="arr">→</span>
+    <span class="st">Принимают решение</span><span class="arr">→</span>
+    <span class="st">Проверить оплату</span><span class="arr">→</span>
+    <span class="st win">Успешно — оплачено</span>
+  </div>
+  <table>
+    <tr><th>Этап</th><th>Действие</th></tr>
+    <tr><td><b>Неразобранное</b></td><td>Новая заявка. Разобрать, заполнить поля, перевести в «Рег. без оплаты».</td></tr>
+    <tr><td><b>Рег. без оплаты</b></td><td>Уточнить тариф. Дать реквизиты/СБП-ссылку. → «Принимают решение».</td></tr>
+    <tr><td><b>Принимают решение</b></td><td>Ждём оплату. Напоминания.</td></tr>
+    <tr><td><b>Проверить оплату</b></td><td>Клиент сказал «оплатил» → сверьте поступление по банку/СБП.</td></tr>
+    <tr><td><b>Успешно — оплачено</b></td><td>Перетащите сюда ПОСЛЕ подтверждения денег. → <b>билет выпускается и уходит клиенту автоматически.</b></td></tr>
+    <tr><td><b>Закрыто — не реализовано</b></td><td>Отказ / не оплатил.</td></tr>
+  </table>
+  <div class="callout c-green">
+    <b>✅ Подтверждение оплаты = перевод сделки в «Успешно — оплачено».</b>
+    Это запускает авто-выдачу билета (QR + PDF). Вручную выпускать ничего не нужно.
+  </div>
+  <div class="callout c-red">
+    <b>🔴 Не переводите в «Оплачено» до подтверждения денег по банку</b> — это сразу запустит выпуск билета.
+  </div>
+  <p style="font-size:14px;color:var(--muted)">Альтернатива из бота: команда <code>/paid &lt;телефон&gt;</code> — тоже выпускает билет. Основной путь — перетаскивание в amoCRM.</p>
+</section>
+
+<section class="card">
+  <h2><span class="num">5</span>Гарантия доставки билета</h2>
+  <p>Билет уходит автоматически по приоритету:</p>
+  <ol>
+    <li><b>Telegram</b> — если человек проходил бота (надёжнее всего, билет + вся инфа там).</li>
+    <li><b>E-mail</b> — если указан e-mail (придёт PDF).</li>
+    <li>Если <b>нет ни Telegram, ни e-mail</b> — система поставит вам задачу «отправить билет вручную» (код билета будет в сделке).</li>
+  </ol>
+  <div class="callout c-amber">
+    <b>Поэтому при заявке со ЗВОНКА всегда:</b>
+    Попросите <b>e-mail</b> (минимум), <b>или</b> дайте ссылку на бота <b>@sadaosato_bot</b> и попросите нажать «Старт» — тогда билет придёт в Telegram автоматически и человек увидит программу/спикеров/отели.
+  </div>
+  <div class="callout c-green">
+    <b>✅ Ручные сделки (звонок/личка) теперь тоже выдают билет автоматически.</b>
+    При переводе в «Оплачено» система сама создаёт запись по контакту и шлёт билет: в Telegram (если есть), иначе на e-mail. Поэтому в карточке должен быть <b>телефон и/или e-mail</b>. Если нет ни Telegram, ни e-mail — придёт задача «отправить билет вручную» (с кодом), свяжитесь по телефону.
+  </div>
+</section>
+
+<section class="card">
+  <h2><span class="num">6</span>Чек-лист обработки одной заявки</h2>
+  <ul class="check">
+    <li>Заявка пришла (сайт / бот / звонок).</li>
+    <li>Поиск по телефону в amoCRM (антидубль).</li>
+    <li>Заполнены ФИО, телефон, <b>тариф</b>, канал (Telegram / e-mail).</li>
+    <li>Дали реквизиты / СБП, перевели в «Принимают решение».</li>
+    <li>Оплата подтверждена по банку → перетащили в «Успешно — оплачено».</li>
+    <li>Убедились, что билет ушёл (Telegram / e-mail). Если задача «отправить вручную» — отправили код.</li>
+    <li>Если была задача «объедините сделки» — объединили.</li>
+  </ul>
+</section>
+
+<section class="card">
+  <h2><span class="num">7</span>Что НЕ делать</h2>
+  <ul class="no">
+    <li>Не создавать новую сделку без поиска по телефону.</li>
+    <li>Не переводить в «Оплачено» до подтверждения денег (запустит билет).</li>
+    <li>Не оставлять сделку без тарифа.</li>
+    <li>Не вести параллельный учёт в блокноте / Excel — только amoCRM.</li>
+  </ul>
+</section>
+
+<section class="card">
+  <h2><span class="num">8</span>AI-помощник в боте («Анна») — работает сам</h2>
+  <p>В Telegram-боте есть AI-ассистент «Анна». Работает автоматически, <b>вам ничего настраивать не нужно</b>:</p>
+  <ul>
+    <li><b>Сам пишет</b> тем, кто зарегистрировался в боте, но <b>не оплатил</b> (через ~2 часа): спрашивает, остались ли вопросы, помогает, мягко ведёт к оплате.</li>
+    <li><b>Отвечает на вопросы</b> по программе, спикеру, пакетам; шлёт ссылку на оплату.</li>
+    <li><b>Зовёт вас</b>, когда не может помочь (сложный вопрос, проблема с оплатой, клиент просит человека): говорит клиенту «переключу на старшего оператора».</li>
+  </ul>
+  <h3>Что делаете вы при эскалации</h3>
+  <ol>
+    <li>Вам приходит уведомление в Telegram: «🤝 Эскалация… клиент tg_id=…».</li>
+    <li>AI <b>встаёт на паузу</b> по этому клиенту (~2 часа) — не перебивает вас.</li>
+    <li>Вы отвечаете клиенту: команда <code>/takeover &lt;tg_id&gt;</code> в боте берёт диалог на себя. Весь диалог виден в чате сделки amoCRM. Закончили — <code>/release &lt;tg_id&gt;</code> вернёт диалог боту.</li>
+  </ol>
+  <div class="callout c-amber"><b>⚠️ AI не выдумывает цены/даты</b> — если факта нет, он зовёт вас. Доверяйте этим эскалациям, отвечайте быстро.</div>
+</section>
+
+<footer>
+  Сайт sadaosato.pro · бот @sadaosato_bot · билеты tickets.sadaosato.pro · аналитика QR — в админке.<br>
+  Технические детали — у разработчика. Аналитика/маркетинг — sadaosato.pro/dash (менеджеру не нужно).
+</footer>
+
+</div>
+</body>
+</html>

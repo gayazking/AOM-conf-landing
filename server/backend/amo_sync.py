@@ -489,6 +489,66 @@ def _flag_no_tariff(lead_id):
     return "flagged"
 
 
+def _lead_contact_info(lead_id):
+    """name/phone/email/telegram из первого привязанного контакта сделки (1 запрос
+    на контакт). Для импорта ручных сделок amo (не из сайта/бота) в локальную базу."""
+    lead = _get_lead(lead_id, withp="contacts")
+    if not lead:
+        return None
+    try:
+        tg_fid = int(_cfg().get("AMO_CF_CT_TELEGRAM") or 0) or None
+    except ValueError:
+        tg_fid = None
+    for c in lead.get("_embedded", {}).get("contacts", []):
+        try:
+            cr = _amo("GET", "/api/v4/contacts/%d" % int(c.get("id")))
+            if cr.status_code != 200:
+                continue
+            cj = cr.json()
+            info = {"name": cj.get("name"), "phone": None, "email": None,
+                    "telegram": None, "contact_id": cj.get("id")}
+            for cf in (cj.get("custom_fields_values") or []):
+                code, fid = cf.get("field_code"), cf.get("field_id")
+                vals = cf.get("values") or []
+                if not vals:
+                    continue
+                v = vals[0].get("value")
+                if code == "PHONE" and not info["phone"]:
+                    info["phone"] = v
+                elif code == "EMAIL" and not info["email"]:
+                    info["email"] = v
+                elif tg_fid and fid == tg_fid and not info["telegram"]:
+                    info["telegram"] = v
+            if info["phone"] or info["email"]:
+                return info
+        except Exception:
+            pass
+    return None
+
+
+def _import_from_amo(lead_id):
+    """Создать локальную регистрацию из ручной сделки amo (контакт), чтобы выпуск
+    билета и доставка (Telegram→email→задача) сработали. Возвращает строку или None."""
+    info = _lead_contact_info(lead_id)
+    if not info or not (info.get("phone") or info.get("email")):
+        return None
+    pkg = _tariff_from_lead(lead_id)
+    rec = {
+        "name": info.get("name"), "phone": info.get("phone"), "email": info.get("email"),
+        "telegram_username": (info.get("telegram") or "").lstrip("@") or None,
+        "source": "amo", "amocrm_lead_id": int(lead_id),
+        "format": pkg, "package": pkg,
+    }
+    try:
+        reg.upsert_registration(rec)
+    except Exception as e:
+        log.error("import_from_amo upsert failed lead=%s: %s", lead_id, e)
+        return None
+    row = _find_by_amo_lead(lead_id)
+    log.info("imported manual amo lead=%s -> reg=%s", lead_id, (row or {}).get("id"))
+    return row
+
+
 def _issue_win(reg_id, lead_id, row):
     """Confirmed payment -> resolve tariff, issue pretix ticket (backend also
     e-mails the PDF), deliver to Telegram, and let the automation move the card to
@@ -528,6 +588,19 @@ def _issue_win(reg_id, lead_id, row):
                     % t.get("human_code"), 1, 3600)
     forward(reg_id, "paid")          # Статус оплаты=Оплачено + Дата + автоматика двигает карточку в «Оплачено»
     forward(reg_id, "ticket_issued")  # Статус билета=Выпущен + № заказа pretix
+    # сквозная аналитика: офлайн-конверсия в Метрику (какой источник/РК принёс оплату + выручка)
+    try:
+        import metrika
+        try:
+            _price = int(pkg)
+        except (TypeError, ValueError):
+            _price = 0
+        metrika.offline_purchase(_cfg(),
+                                 client_id=reg._g(row, "ym_client_id"),
+                                 yclid=reg._g(row, "yclid"),
+                                 price_eur=_price, reg_id=reg_id)
+    except Exception as _e:
+        log.warning("metrika offline hook failed reg=%s: %s", reg_id, _e)
     return {"action": "win_issued", "reg_id": reg_id, "pretix_order": t.get("pretix_order"),
             "human_code": t.get("human_code"), "delivered": delivered, "emailed": emailed}
 
@@ -543,7 +616,11 @@ def reverse_field_paid(lead_id):
         return {"action": "pay_field_not_set"}
     row = _find_by_amo_lead(lead_id) or _find_by_phone(_lead_phone(lead_id))
     if not row:
-        return {"action": "no_reg"}
+        # manual amo deal (call/DM) never seen locally -> import it so the ticket
+        # is still issued + delivered (guaranteed delivery).
+        row = _import_from_amo(lead_id)
+        if not row:
+            return {"action": "no_reg"}
     if row.get("amocrm_lead_id") != int(lead_id):
         _attach_lead(row["id"], lead_id)
     if row.get("status") in ("paid", "ticket_issued", "checked_in") and row.get("pretix_order_code"):
@@ -567,7 +644,12 @@ def reverse_status_change(lead_id, new_status, phone=None):
            or (_find_by_phone(phone) if phone else None)
            or _find_by_phone(_lead_phone(lead_id)))
     if not row:
-        return {"action": "no_reg", "lead_id": lead_id}
+        # manual deal moved straight to WIN -> import from amo so the ticket
+        # issues + delivers; for non-WIN moves a missing local row is harmless.
+        if new_status == ST_WIN:
+            row = _import_from_amo(lead_id)
+        if not row:
+            return {"action": "no_reg", "lead_id": lead_id}
     if row.get("amocrm_lead_id") != int(lead_id):
         _attach_lead(row["id"], lead_id)
     if _is_echo(row, new_status):

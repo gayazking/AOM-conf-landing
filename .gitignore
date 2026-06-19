@@ -27,3 +27,6 @@ infra/pretix/pretix.cfg
 admin_pw.txt
 registrars/qr/
 
+
+# secrets — НЕ коммитить
+docs/CREDENTIALS.md

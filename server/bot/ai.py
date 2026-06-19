@@ -65,15 +65,16 @@ def _get_client():
     return _client
 
 
-def _build_params(model: str, input_items: list) -> dict:
+def _build_params(model: str, input_items: list, with_tools: bool = True) -> dict:
     p = {
         "model": model,
         "input": input_items,
         "max_output_tokens": config.AI_MAX_OUTPUT_TOKENS,
         "store": False,
-        "tools": TOOLS,
-        "tool_choice": "auto",
     }
+    if with_tools:
+        p["tools"] = TOOLS
+        p["tool_choice"] = "auto"
     if model.startswith("gpt-5"):
         p["reasoning"] = {"effort": "low"}
         p["text"] = {"verbosity": "low"}
@@ -83,14 +84,14 @@ def _build_params(model: str, input_items: list) -> dict:
     return p
 
 
-async def _create_with_backoff(model: str, input_items: list):
+async def _create_with_backoff(model: str, input_items: list, with_tools: bool = True):
     """responses.create with exponential backoff on rate/API errors."""
     client = _get_client()
     delays = [1, 2, 4]
     last_exc: Exception | None = None
     for i in range(len(delays) + 1):
         try:
-            return await client.responses.create(**_build_params(model, input_items))
+            return await client.responses.create(**_build_params(model, input_items, with_tools))
         except (RateLimitError, APIError) as exc:
             last_exc = exc
             if i < len(delays):
@@ -101,6 +102,32 @@ async def _create_with_backoff(model: str, input_items: list):
             last_exc = exc
             break
     raise last_exc if last_exc else RuntimeError("responses.create failed")
+
+
+async def run_proactive(tg_id: int, situation: str) -> tuple[str, list[dict]]:
+    """Generate a PROACTIVE opener (the bot writes first, e.g. a 2h nudge).
+
+    `situation` is an ephemeral developer instruction describing why we reach out;
+    it is NOT persisted. No tools are offered (an opener is plain text). Returns
+    (text, [assistant_item]); persist the assistant item so the user's reply
+    continues the same thread via run_turn(). On any failure returns ("", [])."""
+    import ai_memory
+
+    history = await ai_memory.load_history(tg_id)
+    input_items: list = [
+        {"role": "developer", "content": build_system_prompt()},
+        *history,
+        {"role": "developer", "content": situation},
+    ]
+    try:
+        resp = await _create_with_backoff(config.AI_MODEL, input_items, with_tools=False)
+        text = (getattr(resp, "output_text", "") or "").strip()
+        if not text:
+            return "", []
+        return text, [{"role": "assistant", "content": text}]
+    except Exception as exc:
+        log.warning("AI run_proactive failed for %s: %s", tg_id, type(exc).__name__)
+        return "", []
 
 
 async def run_turn(tg_id: int, user_text: str) -> tuple[str, list[dict]]:

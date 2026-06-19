@@ -141,6 +141,16 @@ async def _fire_drip(job_id: str, tg_id: int, kind: str) -> None:
         ):
             await db.mark_job_sent(job_id)
             return
+        # The +2h touch (funnel_1h) is an AI helper: the bot reaches out first,
+        # asks if questions remain, gently nudges to payment, and the user's
+        # reply is then handled by the live AI agent (answers + escalates to the
+        # senior operator). Falls back to the static drip if AI is off/unavailable.
+        if kind == "funnel_1h" and config.AI_ENABLED and config.AI_MODE in ("hybrid", "autopilot"):
+            if await _send_ai_nudge(tg_id, user):
+                await db.mark_job_sent(job_id)
+                log.info("AI nudge (funnel_1h) sent to %s", tg_id)
+                return
+            # else fall through to the static drip below
         text = _drip_text(kind)
         await _bot.send_message(
             tg_id, text, reply_markup=keyboards.funnel_cta_kb(kind)
@@ -156,6 +166,57 @@ async def _fire_drip(job_id: str, tg_id: int, kind: str) -> None:
         await db.mark_job_sent(job_id)  # do not infinite-retry marketing msgs
     except Exception:  # pragma: no cover - defensive
         log.exception("Unexpected error firing drip %s for %s", kind, tg_id)
+
+
+async def _send_ai_nudge(tg_id: int, user: dict) -> bool:
+    """Proactive AI opener for the +2h unpaid touch. Returns True if sent.
+
+    Skips (→ static fallback) if a manager already owns the chat (AI paused).
+    Seeds the assistant opener into AI memory so the client's reply continues
+    the same thread; mirrors the outgoing line into the amoCRM deal chat."""
+    try:
+        import ai
+        import ai_memory
+
+        if not await db.is_ai_active(tg_id):
+            return False  # human took over — don't talk over them
+
+        full_name = (user.get("name") or "").strip()
+        first = full_name.split()[0] if full_name else ""
+        situation = (
+            "[ПРОАКТИВНОЕ СООБЩЕНИЕ — ты пишешь первой, клиент не отвечал]. "
+            "Прошло ~2 часа после регистрации клиента в боте, оплаты пока нет. "
+            "Напиши короткое тёплое сообщение (2–4 предложения, на «вы»): мягко "
+            "спроси, остались ли вопросы и с чем помочь, ненавязчиво подведи к "
+            "выбору пакета и оплате. Без давления, без вызова инструментов — только текст."
+            + (f" Имя клиента: {first}." if first else "")
+        )
+        text, items = await ai.run_proactive(tg_id, situation)
+        if not text:
+            return False
+        await _bot.send_message(
+            tg_id, text, parse_mode=None,
+            reply_markup=keyboards.funnel_cta_kb("funnel_1h"),
+        )
+        for it in items:
+            try:
+                await ai_memory.append_item(tg_id, it)
+            except Exception:
+                log.exception("persist nudge item failed for %s", tg_id)
+        # mirror the outgoing nudge into the amoCRM deal chat (best-effort)
+        try:
+            import amojo_bridge
+
+            await amojo_bridge.push_to_amojo(
+                tg_id, name=full_name, username=user.get("username"),
+                phone=user.get("phone"), text=f"[бот/ИИ] {text}", message_id=None,
+            )
+        except Exception:
+            log.exception("amojo mirror (nudge) failed for %s", tg_id)
+        return True
+    except Exception:
+        log.exception("AI nudge failed for %s", tg_id)
+        return False
 
 
 async def stop_drip(tg_id: int) -> None:

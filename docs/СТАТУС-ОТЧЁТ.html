@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Статус системы — Казань-Токио 2026</title>
+<style>
+  :root{
+    --bg:#0d1320; --panel:#161f31; --panel2:#1b263c; --line:#26324c;
+    --ink:#e7ecf3; --mut:#8a96a8;
+    --green:#34d399; --green-bg:#10331f; --amber:#fbbf24; --amber-bg:#3a2e0c;
+    --red:#f87171; --blue:#46d3ff; --violet:#a78bfa;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font:15px/1.55 -apple-system,Segoe UI,Roboto,sans-serif;padding:28px 16px}
+  .wrap{max-width:1000px;margin:0 auto}
+  .head{display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:10px;margin-bottom:8px}
+  h1{font-size:24px;margin:0}
+  .sub{color:var(--mut);font-size:13px}
+  .ok-banner{background:linear-gradient(135deg,#10331f,#0d2a3a);border:1px solid #1f5f3f;
+       border-radius:14px;padding:14px 18px;margin:14px 0 22px;display:flex;align-items:center;gap:12px;font-size:16px}
+  .dot{width:11px;height:11px;border-radius:50%;flex:0 0 auto;box-shadow:0 0 8px currentColor}
+  .g{color:var(--green);background:var(--green)} .a{color:var(--amber);background:var(--amber)} .r{color:var(--red);background:var(--red)}
+  h2{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);margin:24px 0 10px}
+  .grid{display:grid;gap:12px}
+  .g3{grid-template-columns:repeat(3,1fr)} .g4{grid-template-columns:repeat(4,1fr)} .g2{grid-template-columns:repeat(2,1fr)}
+  @media(max-width:760px){.g3,.g4,.g2{grid-template-columns:1fr 1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:14px 16px}
+  .card .t{display:flex;align-items:center;gap:8px;font-weight:600}
+  .card .s{color:var(--mut);font-size:12.5px;margin-top:4px}
+  .kpi{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:16px}
+  .kpi .n{font-size:28px;font-weight:700;line-height:1}
+  .kpi .k{color:var(--mut);font-size:12.5px;margin-top:6px}
+  .kpi .n.green{color:var(--green)} .kpi .n.blue{color:var(--blue)} .kpi .n.violet{color:var(--violet)} .kpi .n.amber{color:var(--amber)}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:18px}
+  .row{margin:9px 0}
+  .row .lab{display:flex;justify-content:space-between;font-size:13.5px;margin-bottom:4px}
+  .bar{height:14px;border-radius:7px;background:var(--panel2);overflow:hidden}
+  .bar>span{display:block;height:100%;border-radius:7px}
+  .b-blue>span{background:linear-gradient(90deg,#2b8fd6,#46d3ff)}
+  .b-amber>span{background:linear-gradient(90deg,#b97f12,#fbbf24)}
+  .b-violet>span{background:linear-gradient(90deg,#7c5cd6,#a78bfa)}
+  .b-green>span{background:linear-gradient(90deg,#1f9d6b,#34d399)}
+  .b-red>span{background:linear-gradient(90deg,#b54343,#f87171)}
+  .meter{height:9px;border-radius:6px;background:var(--panel2);overflow:hidden;margin-top:8px}
+  .meter>span{display:block;height:100%}
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  td{padding:7px 4px;border-bottom:1px solid var(--line)}
+  td.r{text-align:right;color:var(--mut)}
+  .tag{display:inline-block;font-size:11px;padding:2px 8px;border-radius:20px;font-weight:600}
+  .tag.ok{background:var(--green-bg);color:var(--green)} .tag.warn{background:var(--amber-bg);color:var(--amber)}
+  .foot{color:var(--mut);font-size:12px;text-align:center;margin-top:26px}
+  a{color:var(--blue)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="head">
+  <h1>🩺 Статус системы «Казань — Токио 2026»</h1>
+  <div class="sub">Обновлён 2026-06-19 19:31 MSK · прод NL (sadaosato.pro)</div>
+</div>
+
+<div class="ok-banner">
+  <span class="dot g"></span>
+  <b>Всё работает.</b>&nbsp;<span class="sub">Сайт, API, бот, билеты, почта, аналитика, бэкапы — в норме. Критичных проблем нет.</span>
+</div>
+
+<h2>Сервисы</h2>
+<div class="grid g4">
+  <div class="card"><div class="t"><span class="dot g"></span>Сайт</div><div class="s">HTTPS 200 · 0.8 c · cert 84 дн</div></div>
+  <div class="card"><div class="t"><span class="dot g"></span>API (backend)</div><div class="s">sato-api active · /api/health 200</div></div>
+  <div class="card"><div class="t"><span class="dot g"></span>Telegram-бот</div><div class="s">sato-bot active · long-poll</div></div>
+  <div class="card"><div class="t"><span class="dot g"></span>pretix (билеты)</div><div class="s">3 контейнера Up 5 дн · /control 302</div></div>
+  <div class="card"><div class="t"><span class="dot g"></span>amoCRM</div><div class="s">токен LIVE (до 2030) · API 200</div></div>
+  <div class="card"><div class="t"><span class="dot g"></span>Почта (SMTP)</div><div class="s">registrator@ · Mail.ru · LIVE</div></div>
+  <div class="card"><div class="t"><span class="dot g"></span>Datasette / nginx</div><div class="s">active</div></div>
+  <div class="card"><div class="t"><span class="dot g"></span>Метрика↔amo</div><div class="s">сквозная + офлайн-конверсии LIVE</div></div>
+</div>
+
+<h2>Сделки в amoCRM (воронка)</h2>
+<div class="grid g4" style="margin-bottom:14px">
+  <div class="kpi"><div class="n blue">87</div><div class="k">сделок всего</div></div>
+  <div class="kpi"><div class="n green">3</div><div class="k">оплачено (WIN)</div></div>
+  <div class="kpi"><div class="n">114 000 €</div><div class="k">план воронки (актив)</div></div>
+  <div class="kpi"><div class="n amber">24</div><div class="k">открытых задач менеджеру</div></div>
+</div>
+<div class="panel">
+  <div class="row"><div class="lab"><span>Проверить оплату</span><span>34</span></div><div class="bar b-blue"><span style="width:100%"></span></div></div>
+  <div class="row"><div class="lab"><span>Рег. без оплаты</span><span>23</span></div><div class="bar b-violet"><span style="width:68%"></span></div></div>
+  <div class="row"><div class="lab"><span>Принимают решение</span><span>15</span></div><div class="bar b-amber"><span style="width:44%"></span></div></div>
+  <div class="row"><div class="lab"><span>Закрыто (отказ)</span><span>12</span></div><div class="bar b-red"><span style="width:35%"></span></div></div>
+  <div class="row"><div class="lab"><span>✅ Оплачено</span><span>3</span></div><div class="bar b-green"><span style="width:9%"></span></div></div>
+  <div class="s" style="color:var(--mut);font-size:12px;margin-top:10px">Подтверждённая выручка 1 800 € (у 2 из 3 WIN не проставлен тариф/цена — поставить в карточке). Неразобранных нет — все заявки разобраны.</div>
+</div>
+
+<h2>Доставка билета (гарантия)</h2>
+<div class="grid g2">
+  <div class="panel">
+    <div class="t" style="font-weight:600;margin-bottom:6px">Каналы доставки</div>
+    <table>
+      <tr><td>📧 Email есть (доставка авто)</td><td class="r">74 / 92 <span class="tag ok">80%</span></td></tr>
+      <tr><td>✈️ Telegram (поле в amo)</td><td class="r">0 <span class="tag warn">новое поле</span></td></tr>
+      <tr><td>📞 Только телефон → задача менеджеру</td><td class="r">18</td></tr>
+    </table>
+    <div class="s" style="color:var(--mut);font-size:12px;margin-top:8px">Лестница: Telegram → e-mail → задача. Ручные сделки при оплате авто-импортируются и тоже выдают билет.</div>
+  </div>
+  <div class="panel">
+    <div class="t" style="font-weight:600;margin-bottom:6px">Рассылки / автоворонка</div>
+    <table>
+      <tr><td>Бот: drip-цепочка</td><td class="r"><span class="tag ok">вкл</span></td></tr>
+      <tr><td>AI-помощник «Анна» (пуш +2ч неоплатившим)</td><td class="r"><span class="tag ok">вкл</span></td></tr>
+      <tr><td>Email-билеты (Mail.ru registrator@)</td><td class="r"><span class="tag ok">LIVE</span></td></tr>
+      <tr><td>Эскалация на менеджера (Telegram)</td><td class="r"><span class="tag ok">вкл</span></td></tr>
+    </table>
+  </div>
+</div>
+
+<h2>Мониторинг · бэкапы · ресурсы</h2>
+<div class="grid g4">
+  <div class="card"><div class="t"><span class="dot g"></span>Health-чек</div><div class="s">state: ok · cron каждые 5 мин</div></div>
+  <div class="card"><div class="t"><span class="dot g"></span>Офсайт-бэкап</div><div class="s">сегодня 05:30 · NL→jump (gpg)</div></div>
+  <div class="card"><div class="t"><span class="dot g"></span>Выгрузка сделок</div><div class="s">сегодня 03:30 (ежедн.)</div></div>
+  <div class="card"><div class="t"><span class="dot g"></span>SSL</div><div class="s">валиден 84 дня · авто-renew</div></div>
+</div>
+<div class="panel" style="margin-top:12px">
+  <div class="row"><div class="lab"><span>CPU load (1м)</span><span>0.80</span></div><div class="meter"><span class="b-green" style="background:var(--green);width:27%"></span></div></div>
+  <div class="row"><div class="lab"><span>RAM</span><span>1 969 / 3 812 МБ (52%)</span></div><div class="meter"><span style="background:var(--amber);width:52%"></span></div></div>
+  <div class="row"><div class="lab"><span>Диск</span><span>14 / 59 ГБ (25%)</span></div><div class="meter"><span style="background:var(--green);width:25%"></span></div></div>
+</div>
+
+<h2>На контроле (не критично)</h2>
+<div class="panel">
+  <table>
+    <tr><td>⚠️ У 2 из 3 оплаченных не проставлен тариф/цена</td><td class="r">поставить в amo</td></tr>
+    <tr><td>⚠️ 24 открытых задачи менеджеру</td><td class="r">разобрать</td></tr>
+    <tr><td>○ DKIM для почты (усилит доставляемость)</td><td class="r">опц.</td></tr>
+    <tr><td>○ Весь код сессии не закоммичен в git</td><td class="r">коммит+пуш</td></tr>
+  </table>
+</div>
+
+<div class="foot">Автоотчёт состояния · технические детали — у разработчика · аналитика: sadaosato.pro/dash</div>
+
+</div>
+</body>
+</html>

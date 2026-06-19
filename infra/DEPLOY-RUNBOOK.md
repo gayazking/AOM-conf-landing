@@ -85,6 +85,20 @@ RAM<2ГБ → добавить swap: `fallocate -l 3G /swapfile && chmod 600 /sw
 ### 4. DNS (reg.ru)
 A `sadaosato.pro`, `www`, `tickets.sadaosato.pro` → IP сервера. AAAA при наличии IPv6.
 
+### 5. Сквозная аналитика Яндекс.Метрика ↔ amoCRM
+```bash
+# создать кастом-поля сделки в amo (идемпотентно), вывести AMO_CF_*=<id>:
+cd /opt/sato && sudo -u www-data HOME=/var/lib/sato venv/bin/python create_amo_fields.py
+# вписать выведенные AMO_CF_* + блок Метрики в /etc/sato/amo.env:
+#   YANDEX_METRIKA_COUNTER=109717932 / _TARGET=purchase / _CURRENCY=EUR / _TOKEN=<oauth>
+systemctl restart sato-api   # app.py на старте сам прогонит reg.init() (ALTER ym_client_id/yclid/page_url)
+```
+- ym_client_id ловится на сайте: сниппет `__satoYmPatched` в index.html (исходник — `tracking.js`).
+  При пересборке бандла он уже внутри `Казань-Токио-2026-TRACKED.html`.
+- Офлайн-конверсии (amo→Метрика при WIN) включаются токеном `YANDEX_METRIKA_TOKEN` —
+  получить по `docs/ЯНДЕКС-МЕТРИКА-ТОКЕН.md`. Без токена — no-op. В Метрике создать
+  цель JS-событие с id `purchase`.
+
 ## Уроки/грабли (КРИТИЧНО — экономит часы)
 1. **Timeweb (и часть RU-хостингов) режут payload на 80/443 на edge** (TCP-handshake проходит, данные дропаются; :22 работает). Диагностика: `tcpdump -ni any "host <IP> and port 80"` — видно только SYN/SYN-ACK/ACK, без данных; `mtr` 0% потерь. Лечится только на стороне хостинга (тикет) или переездом. **NL/EU-сервер проблемы не имеет.**
 2. **RU-сети режут TLS 1.3** (частично). Если сайт «то работает, то нет» из РФ — в nginx `ssl_protocols TLSv1.2;`.
@@ -97,5 +111,6 @@ A `sadaosato.pro`, `www`, `tickets.sadaosato.pro` → IP сервера. AAAA п
 
 ## Восстановление данных
 - **amoCRM (облако) — источник истины** по сделкам/контактам, переживает смерть сервера.
-- `registrations.sqlite3` (локальная операционка), `bot.sqlite3`, pretix-заказы — только на сервере. Бэкап: `infra/sato-backup.sh` (cron 04:00) + `backup_deals.py` (выгрузка всех сделок, cron 03:00). **Хранить офсайт!**
+- `registrations.sqlite3` (локальная операционка), `bot.sqlite3`, pretix-заказы — только на сервере. Локальный бэкап: `infra/sato-backup.sh` (cron 04:00) + `backup_deals.py` (выгрузка всех сделок, cron 03:00).
+- **Офсайт-бэкап (КРИТИЧНО — уже потеряли старую стату из-за его отсутствия):** `infra/offsite-backup.sh` на NL (cron 05:30) шифрует gpg (AES256) и шлёт `registrations.sqlite3`+`bot.sqlite3`+`amo_tokens.json`+выгрузку сделок+`pretix.sql` на jump `217.60.5.92:/var/backups/sato-offsite/` по ssh-ключу. Passphrase + восстановление — в `docs/CREDENTIALS.md` (раздел «Офсайт-бэкап»). При переносе на новый сервер: завести `/root/.ssh/id_ed25519`, прописать pubkey в jump `authorized_keys`, положить `/etc/sato/backup.pass`, поставить cron.
 - Перед ЛЮБОЙ правкой прода — `backup_deals.py` (бэкап-выгрузка всех сделок).
