@@ -39,9 +39,13 @@ ym(109717932,'init',{ssr:true,webvisor:true,clickmap:true,accurateTrackBounce:tr
   .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:18px;padding-bottom:30px}
   .hcard{background:var(--card);border:1px solid var(--line);border-radius:16px;overflow:hidden;display:flex;flex-direction:column;transition:.18s}
   .hcard:hover{border-color:var(--gold);transform:translateY(-3px)}
-  .ph{position:relative;aspect-ratio:16/10;background:#0c0e13 center/cover no-repeat;overflow:hidden}
-  .ph img{width:100%;height:100%;object-fit:cover;display:block;transition:.4s}
-  .hcard:hover .ph img{transform:scale(1.05)}
+  .ph{position:relative;aspect-ratio:16/10;overflow:hidden;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#1a1d26,#23262f)}
+  .ph.cls5{background:linear-gradient(135deg,#2a2418,#3a2f1c 58%,#1a1d26)}
+  .ph.cls4{background:linear-gradient(135deg,#142231,#1b2c42 58%,#1a1d26)}
+  .ph.cls3{background:linear-gradient(135deg,#1a1d26,#262a35)}
+  .ph::before{content:"🏨";position:absolute;font-size:66px;opacity:.10;right:6px;bottom:-10px}
+  .phname{color:#e8ecf3;font-weight:700;font-size:16px;text-align:center;padding:0 46px;line-height:1.3;z-index:1;text-shadow:0 1px 6px rgba(0,0,0,.5);transition:.3s}
+  .hcard:hover .phname{color:var(--gold2)}
   .badge{position:absolute;top:10px;left:10px;background:rgba(15,17,21,.82);backdrop-filter:blur(4px);color:var(--gold2);font-size:12px;font-weight:700;padding:4px 10px;border-radius:20px;border:1px solid rgba(201,165,114,.4)}
   .near{position:absolute;top:10px;right:10px;background:rgba(31,157,85,.92);color:#fff;font-size:11px;font-weight:700;padding:4px 9px;border-radius:20px}
   .price{position:absolute;bottom:10px;right:10px;background:rgba(15,17,21,.86);color:#fff;font-size:13px;font-weight:700;padding:5px 11px;border-radius:10px}
@@ -77,7 +81,7 @@ ym(109717932,'init',{ssr:true,webvisor:true,clickmap:true,accurateTrackBounce:tr
   <a class="back" href="https://sadaosato.pro/">← На главную саммита</a>
   <div class="kicker">Казань — Токио 2026 · проживание</div>
   <h1 class="serif">Где остановиться в Казани</h1>
-  <p class="lead">18 проверенных гостиниц всех классов — от премиум-отелей у Кремля до удобных вариантов в районе площадки. Реальные фото, звёзды, ориентир по цене, удобства, расстояние до площадки, карта и бронирование. Площадка саммита — <b style="color:var(--gold2)">Гранд Отель «Ривьера»</b>.</p>
+  <p class="lead">18 проверенных гостиниц всех классов — от премиум-отелей у Кремля до удобных вариантов в районе площадки. Звёзды, ориентир по цене, удобства, расстояние до площадки, карта и бронирование. Площадка саммита — <b style="color:var(--gold2)">Гранд Отель «Ривьера»</b>.</p>
   <div class="venue">
     <div class="vico">🏟</div>
     <div>
@@ -206,7 +210,7 @@ function render(f){
    .sort((a,b)=> f==='near'? a.km-b.km : 0)
    .forEach(h=>{
     const el=document.createElement('div');el.className="hcard";
-    el.innerHTML=`<div class="ph"><img loading="lazy" src="${h.img}" alt="${h.n}" onerror="this.parentNode.style.background='linear-gradient(135deg,#1a1d26,#23262f)'">
+    el.innerHTML=`<div class="ph cls${h.cls}"><span class="phname">${h.n}</span>
         <span class="badge">${h.cls}★ · ${h.cls===5?'премиум':h.cls===4?'бизнес':'эконом'}</span>
         ${h.km<=NEAR_KM?'<span class="near">рядом с площадкой</span>':''}
         <span class="price">от ${h.price}&nbsp;₽ <small>/ ночь</small></span></div>
@@ -224,9 +228,6 @@ function render(f){
     grid.appendChild(el);
   });
 }
-// images (explicit map: array order -> downloaded file number)
-const IMG=[2,3,4,5,6,7,8,9,12,10,11,13,14,15,16,17,19,18];
-H.forEach((h,i)=>h.img="/hotel-img/"+IMG[i]+".jpg");
 render('all');
 document.querySelectorAll('#filters .chip').forEach(c=>c.onclick=()=>{
   document.querySelectorAll('#filters .chip').forEach(x=>x.classList.remove('on'));
