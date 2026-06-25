@@ -182,7 +182,9 @@ def _email_ticket(cfg, to_email, pdf_bytes, png_bytes, human_code, name, package
     msg.set_content(
         "Здравствуйте, %s!\n\nВаша оплата подтверждена. Билет на международный стоматологический "
         "саммит «Казань — Токио 2026» — во вложении (PDF с QR-кодом).\n\nТариф: %s\nКод билета: %s\n\n"
-        "Предъявите QR на входе (вход однократный).\nПоддержка: %s\n\nsadaosato.pro"
+        "Предъявите QR на входе (вход однократный).\n\n"
+        "Где остановиться в Казани — спец-цены по промокоду SATO2026: https://sadaosato.pro/hotels\n\n"
+        "Поддержка: %s\n\nsadaosato.pro"
         % (name or "участник", pl, human_code, cfg.get("SUPPORT_PHONE") or "")
     )
     msg.add_attachment(pdf_bytes, maintype="application", subtype="pdf", filename="ticket-kazan-tokyo.pdf")
