@@ -255,8 +255,11 @@ def issue_ticket(reg_id):
         row["pretix_secret"] = qr_payload
         c = reg._conn()
         try:
-            c.execute("UPDATE registrations SET ticket_id=COALESCE(ticket_id,?), ticket_issued_at=COALESCE(ticket_issued_at,?), updated_at=? WHERE id=?",
-                      (ticket_id, _now(), _now(), reg_id))
+            c.execute("UPDATE registrations SET ticket_id=COALESCE(ticket_id,?), "
+                      "pretix_order_code=COALESCE(pretix_order_code,?), "
+                      "pretix_secret=COALESCE(pretix_secret,?), "
+                      "ticket_issued_at=COALESCE(ticket_issued_at,?), updated_at=? WHERE id=?",
+                      (ticket_id, pretix_code, qr_payload, _now(), _now(), reg_id))
             c.commit()
         finally:
             c.close()
@@ -288,10 +291,14 @@ def issue_ticket(reg_id):
     png = _render_qr_png(qr_payload)
     pdf = _render_pdf(cfg, row.get("full_name"), row.get("package"), row.get("price_eur"), human_code, png)
 
-    # e-mail the PDF ticket (QR embedded) to the buyer if we have an address + SMTP
+    # e-mail the PDF ticket (QR embedded) to the buyer if we have an address + SMTP.
+    # Idempotency: NEVER e-mail twice — if this registration already got an email
+    # ticket (qr_delivered_channels contains 'email'), skip (prevents the duplicate
+    # ticket emails seen when a paid/WIN webhook fires more than once).
     emailed = False
     to_email = (row.get("email_lc") or "").strip()
-    if to_email and "@" in to_email:
+    _already_emailed = "email" in (row.get("qr_delivered_channels") or "")
+    if to_email and "@" in to_email and not _already_emailed:
         emailed = _email_ticket(cfg, to_email, pdf, png, human_code, row.get("full_name"), row.get("package"))
         if emailed:
             try:

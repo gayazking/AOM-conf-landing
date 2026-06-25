@@ -555,7 +555,7 @@ def _issue_win(reg_id, lead_id, row):
     «Оплачено». Idempotent. Shared by the drag-to-WIN and «Статус оплаты=Оплачено»
     triggers."""
     # idempotency: never re-issue / re-deliver an already-ticketed registration
-    if row.get("status") in ("ticket_issued", "checked_in") and row.get("pretix_order_code"):
+    if row.get("status") in ("ticket_issued", "checked_in") and (row.get("ticket_id") or row.get("pretix_order_code")):
         return {"action": "already_done", "reg_id": reg_id}
     pkg = str(row.get("package") or "")
     if pkg not in _TARIFF:
@@ -623,7 +623,7 @@ def reverse_field_paid(lead_id):
             return {"action": "no_reg"}
     if row.get("amocrm_lead_id") != int(lead_id):
         _attach_lead(row["id"], lead_id)
-    if row.get("status") in ("paid", "ticket_issued", "checked_in") and row.get("pretix_order_code"):
+    if row.get("status") in ("ticket_issued", "checked_in") and (row.get("ticket_id") or row.get("pretix_order_code")):
         return {"action": "already_done", "reg_id": row["id"]}
     # No tariff yet -> flag ONCE via tag, never loop creating tasks (the storm fix).
     pkg = str(row.get("package") or "")
