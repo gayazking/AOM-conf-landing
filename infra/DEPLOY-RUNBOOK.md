@@ -15,6 +15,8 @@
 
 nginx проксирует: `/api/ /amo/` → 8081, `/r/` → 8081 (QR-трекинг), `/reg /checkin` → 8081,
 `/admin/` → 8001 (basic-auth), `/` → статика. pretix — отдельный vhost `tickets.sadaosato.pro` → 8345.
+Статические под-страницы (extension-less URL) — каждой нужна своя location, иначе try_files отдаёт лендинг:
+`location = /consent|/oferta|/privacy|/hotels { try_files /<name>.html =404; }` (файлы в `/var/www/sadaosato/`).
 
 ## Быстрый подъём
 ```bash
