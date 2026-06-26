@@ -207,5 +207,39 @@ document.addEventListener('DOMContentLoaded', async function() {
     };
   }
 }catch(e){}})();</script>
+<script>/* sato: правовой блок (152-ФЗ/ЗоЗПП) — cookie-баннер + юр-футер со ссылками */
+(function(){try{
+  if(window.__satoLegal)return; window.__satoLegal=1;
+  function add(){
+    try{
+      // 1) Юридический футер со ссылками на документы + реквизиты
+      if(!document.getElementById('sato-legal')){
+        var f=document.createElement('div'); f.id='sato-legal';
+        f.style.cssText='background:#0b0f17;color:#8a96a8;font:12.5px/1.7 -apple-system,Segoe UI,Roboto,sans-serif;padding:24px 16px 30px;text-align:center;border-top:1px solid #1c2740';
+        f.innerHTML='<div style="max-width:860px;margin:0 auto">'+
+          '<div style="margin-bottom:9px">'+
+            '<a href="/privacy" style="color:#c9a572;margin:0 9px;text-decoration:none">Политика обработки персональных данных</a>·'+
+            '<a href="/oferta" style="color:#c9a572;margin:0 9px;text-decoration:none">Публичная оферта</a>·'+
+            '<a href="/consent" style="color:#c9a572;margin:0 9px;text-decoration:none">Согласие на обработку ПДн</a>·'+
+            '<a href="/hotels" style="color:#c9a572;margin:0 9px;text-decoration:none">Проживание</a>'+
+          '</div>'+
+          '<div>ИП Халиуллина Гульназ Равилевна · ОГРНИП 326169000111522 · ИНН 16503316819</div>'+
+          '<div style="margin-top:4px">© Международный стоматологический саммит «Казань — Токио 2026» · sadaosato.pro</div>'+
+        '</div>';
+        document.body.appendChild(f);
+      }
+      // 2) Cookie / Яндекс.Метрика — уведомление (один раз)
+      if(!localStorage.getItem('sato_cookie_ok') && !document.getElementById('sato-cookie')){
+        var b=document.createElement('div'); b.id='sato-cookie';
+        b.style.cssText='position:fixed;left:0;right:0;bottom:0;z-index:99999;background:#0d1320;color:#e7ecf3;padding:12px 16px;font:13px/1.45 -apple-system,Segoe UI,Roboto,sans-serif;display:flex;gap:12px;align-items:center;justify-content:center;flex-wrap:wrap;border-top:1px solid #2a3550;box-shadow:0 -4px 18px rgba(0,0,0,.4)';
+        b.innerHTML='<span style="max-width:680px">Мы используем cookie и Яндекс.Метрику для работы сайта и аналитики. Продолжая пользоваться сайтом, вы соглашаетесь с <a href="/privacy" style="color:#46d3ff">Политикой обработки персональных данных</a>.</span>'+
+          '<button id="sato-cookie-ok" style="background:#c9a572;color:#10131a;border:0;border-radius:8px;padding:7px 16px;font-weight:700;cursor:pointer">Принять</button>';
+        document.body.appendChild(b);
+        document.getElementById('sato-cookie-ok').onclick=function(){try{localStorage.setItem('sato_cookie_ok','1')}catch(e){}b.remove()};
+      }
+    }catch(e){}
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',add); else add();
+}catch(e){}})();</script>
 </body>
 </html>
