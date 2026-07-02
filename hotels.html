@@ -206,17 +206,18 @@ H.forEach(h=>h.km=km(h));
 const stars=n=>"★".repeat(n)+"<span style='color:#3a3f4b'>"+"★".repeat(5-n)+"</span>";
 const ymaps=h=>"https://yandex.ru/maps/?mode=search&text="+encodeURIComponent(h.n+", "+h.addr+", Казань");
 const grid=document.getElementById('grid');
-// реальные фото (self-hosted); совпадение по вхождению в название → /hotel-img/<file>.jpg
+// фото (self-hosted). Реальные (с сайтов отелей) — по названию; остальным — тематические фото гостиниц.
 const IMGMAP={"Гранд Отель":"grand","DION":"dion","Millennium":"millennium"};
+const STOCK=["stock1","stock2","stock3","stock4","stock5","stock6","stock7","stock8","stock9","stock10","stock11","stock12","lux1","biz1","biz2"];
+(function(){var si=0; H.forEach(function(h){ var m=""; for(var k in IMGMAP){ if(h.n.indexOf(k)>-1){m=IMGMAP[k];break;} } h.img = m || STOCK[si++ % STOCK.length]; });})();
 function render(f){
   grid.innerHTML="";
   H.filter(h=> f==='all'?true : f==='near'?h.km<=NEAR_KM : h.cls==+f)
    .sort((a,b)=> f==='near'? a.km-b.km : 0)
    .forEach(h=>{
     const el=document.createElement('div');el.className="hcard";
-    var _imgf=""; for(var _k in IMGMAP){ if(h.n.indexOf(_k)>-1){_imgf=IMGMAP[_k];break;} }
-    var _ph = _imgf
-      ? `<img class="phimg" loading="lazy" src="/hotel-img/${_imgf}.jpg" alt="${h.n}" onerror="this.outerHTML='<span class=phname>'+this.alt+'</span>'">`
+    var _ph = h.img
+      ? `<img class="phimg" loading="lazy" src="/hotel-img/${h.img}.jpg" alt="${h.n}" onerror="this.outerHTML='<span class=phname>'+this.alt+'</span>'">`
       : `<span class="phname">${h.n}</span>`;
     el.innerHTML=`<div class="ph cls${h.cls}">${_ph}
         <span class="badge">${h.cls}★ · ${h.cls===5?'премиум':h.cls===4?'бизнес':'эконом'}</span>
