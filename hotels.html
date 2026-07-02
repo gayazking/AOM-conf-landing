@@ -44,6 +44,8 @@ ym(109717932,'init',{ssr:true,webvisor:true,clickmap:true,accurateTrackBounce:tr
   .ph.cls4{background:linear-gradient(135deg,#142231,#1b2c42 58%,#1a1d26)}
   .ph.cls3{background:linear-gradient(135deg,#1a1d26,#262a35)}
   .ph::before{content:"🏨";position:absolute;font-size:66px;opacity:.10;right:6px;bottom:-10px}
+  .phimg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;display:block;transition:.4s}
+  .hcard:hover .phimg{transform:scale(1.05)}
   .phname{color:#e8ecf3;font-weight:700;font-size:16px;text-align:center;padding:0 46px;line-height:1.3;z-index:1;text-shadow:0 1px 6px rgba(0,0,0,.5);transition:.3s}
   .hcard:hover .phname{color:var(--gold2)}
   .badge{position:absolute;top:10px;left:10px;background:rgba(15,17,21,.82);backdrop-filter:blur(4px);color:var(--gold2);font-size:12px;font-weight:700;padding:4px 10px;border-radius:20px;border:1px solid rgba(201,165,114,.4)}
@@ -204,13 +206,19 @@ H.forEach(h=>h.km=km(h));
 const stars=n=>"★".repeat(n)+"<span style='color:#3a3f4b'>"+"★".repeat(5-n)+"</span>";
 const ymaps=h=>"https://yandex.ru/maps/?mode=search&text="+encodeURIComponent(h.n+", "+h.addr+", Казань");
 const grid=document.getElementById('grid');
+// реальные фото (self-hosted); совпадение по вхождению в название → /hotel-img/<file>.jpg
+const IMGMAP={"Гранд Отель":"grand","DION":"dion","Millennium":"millennium"};
 function render(f){
   grid.innerHTML="";
   H.filter(h=> f==='all'?true : f==='near'?h.km<=NEAR_KM : h.cls==+f)
    .sort((a,b)=> f==='near'? a.km-b.km : 0)
    .forEach(h=>{
     const el=document.createElement('div');el.className="hcard";
-    el.innerHTML=`<div class="ph cls${h.cls}"><span class="phname">${h.n}</span>
+    var _imgf=""; for(var _k in IMGMAP){ if(h.n.indexOf(_k)>-1){_imgf=IMGMAP[_k];break;} }
+    var _ph = _imgf
+      ? `<img class="phimg" loading="lazy" src="/hotel-img/${_imgf}.jpg" alt="${h.n}" onerror="this.outerHTML='<span class=phname>'+this.alt+'</span>'">`
+      : `<span class="phname">${h.n}</span>`;
+    el.innerHTML=`<div class="ph cls${h.cls}">${_ph}
         <span class="badge">${h.cls}★ · ${h.cls===5?'премиум':h.cls===4?'бизнес':'эконом'}</span>
         ${h.km<=NEAR_KM?'<span class="near">рядом с площадкой</span>':''}
         <span class="price">от ${h.price}&nbsp;₽ <small>/ ночь</small></span></div>
